@@ -63,10 +63,10 @@ class Export
 		}
 	}
 
-	public static function color(color: Color, alpha:Bool):String
+	public static function color(color: Color, alpha:Bool, hashtag:Bool):String
 	{
-		if (alpha) return color.toHexAlpha();
-		else return color.toHex();
+		if (alpha) return color.toHexAlpha(hashtag);
+		else return color.toHex(hashtag);
 	}
 
 	public static function values(into:Dynamic, values:Array<Value>)

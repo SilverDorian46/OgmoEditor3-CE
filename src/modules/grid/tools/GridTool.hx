@@ -8,5 +8,5 @@ class GridTool extends Tool
 	function get_layerEditor():GridLayerEditor return cast EDITOR.currentLayerEditor;
 
 	public var layer(get, never):GridLayer;
-	function get_layer():GridLayer return cast EDITOR.level.currentLayer;
+	function get_layer():GridLayer return cast EDITOR.currentLevel.currentLayer;
 }

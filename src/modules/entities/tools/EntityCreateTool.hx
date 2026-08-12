@@ -1,5 +1,7 @@
 package modules.entities.tools;
 
+import level.data.Level;
+
 class EntityCreateTool extends EntityTool
 {
 
@@ -10,10 +12,10 @@ class EntityCreateTool extends EntityTool
 	public var firstDelete:Bool = false;
 	public var lastDeletePos:Vector = new Vector();
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (layerEditor.brushTemplate != null && created == null && !deleting && canPreview) 
-			layerEditor.brushTemplate.drawPreview(previewAt);
+			layerEditor.brushTemplate.drawPreview(level, previewAt);
 	}
 
 	override public function activated() canPreview = false;
@@ -25,8 +27,9 @@ class EntityCreateTool extends EntityTool
 
 		if (layerEditor.brushTemplate == null) return;
 		if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+		else layer.snapToPixel(pos, pos);
 
-		EDITOR.level.store("create entity");
+		EDITOR.currentLevel.store("create entity");
 		EDITOR.locked = true;
 		EDITOR.dirty();
 
@@ -68,7 +71,7 @@ class EntityCreateTool extends EntityTool
 		if (!firstDelete)
 		{
 			firstDelete = true;
-			EDITOR.level.store("delete entities");
+			EDITOR.currentLevel.store("delete entities");
 		}
 		layer.entities.removeList(hit);
 		EDITOR.dirty();
@@ -79,6 +82,7 @@ class EntityCreateTool extends EntityTool
 		if (created != null)
 		{
 			if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 
 			if (pos.equals(created.position)) return;
 			pos.clone(created.position);
@@ -94,6 +98,7 @@ class EntityCreateTool extends EntityTool
 		else if (layerEditor.brushTemplate != null && !pos.equals(previewAt))
 		{
 			if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 
 			canPreview = true;
 			previewAt = pos;

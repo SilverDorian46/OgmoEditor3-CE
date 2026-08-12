@@ -95,6 +95,16 @@ class Layer
 		return into;
 	}
 
+	public function snapToPixel(pos: Vector, ?into: Vector): Vector
+	{
+		if (into == null) into = new Vector();
+
+		into.x = Math.floor(pos.x - offset.x) + offset.x;
+		into.y = Math.floor(pos.y - offset.y) + offset.y;
+
+		return into;
+	}
+
 	public function getGridCellsX(width:Float):Int
 	{
 		return Math.ceil((width - offset.x) / template.gridSize.x);

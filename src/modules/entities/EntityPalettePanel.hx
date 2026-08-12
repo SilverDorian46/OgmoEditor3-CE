@@ -124,7 +124,7 @@ class EntityPalettePanel extends SidePanel
 	function get_template():EntityLayerTemplate
 	{
 		if (layerEditor == null) return null;
-		return cast layerEditor.layer.template;
+		return cast layerEditor.getLayerFromCurrentLevel().template;
 	}
 
 }

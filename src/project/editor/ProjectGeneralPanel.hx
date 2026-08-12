@@ -21,7 +21,9 @@ class ProjectGeneralPanel extends ProjectEditorPanel
 	public var directoryDepth:JQuery;
 	public var compactExport:JQuery;
 	public var layerGridDefaultSize:JQuery;
+	public var levelScreenSize:JQuery;
 	public var levelMinSize:JQuery;
+	public var levelDefaultSize:JQuery;
 	public var levelMaxSize:JQuery;
 	public var levelValueManager:ValueTemplateManager;
 
@@ -46,10 +48,10 @@ class ProjectGeneralPanel extends ProjectEditorPanel
 
 		Fields.createLineBreak(root);
 
-		backgroundColor = Fields.createColor("Background Color", Color.white, root);
+		backgroundColor = Fields.createColor("Background Color", Color.white, true, true, root);
 		Fields.createSettingsBlock(root, backgroundColor, SettingsBlock.Half, "Bg Color", SettingsBlock.InlineTitle);
 
-		gridColor = Fields.createColor("Grid Color", Color.white);
+		gridColor = Fields.createColor("Grid Color", Color.white, true, true);
 		Fields.createSettingsBlock(root, gridColor, SettingsBlock.Half, "Grid Color", SettingsBlock.InlineTitle);
 
 		Fields.createLineBreak(root);
@@ -71,11 +73,19 @@ class ProjectGeneralPanel extends ProjectEditorPanel
 
 		Fields.createLineBreak(root);
 
+		// screen size
+		levelScreenSize = Fields.createVector(new Vector(0, 0));
+		Fields.createSettingsBlock(root, levelScreenSize, SettingsBlock.Fourth, "Screen Size", SettingsBlock.InlineTitle);
+
 		// level size
 		levelMinSize = Fields.createVector(new Vector(0, 0));
-		Fields.createSettingsBlock(root, levelMinSize, SettingsBlock.Half, "Min. Level Size", SettingsBlock.InlineTitle);
+		Fields.createSettingsBlock(root, levelMinSize, SettingsBlock.Fourth, "Min. Level Size", SettingsBlock.InlineTitle);
+
+		levelDefaultSize = Fields.createVector(new Vector(0, 0));
+		Fields.createSettingsBlock(root, levelDefaultSize, SettingsBlock.Fourth, "Def. Level Size", SettingsBlock.InlineTitle);
+
 		levelMaxSize = Fields.createVector(new Vector(0, 0));
-		Fields.createSettingsBlock(root, levelMaxSize, SettingsBlock.Half, "Max. Level Size", SettingsBlock.InlineTitle);
+		Fields.createSettingsBlock(root, levelMaxSize, SettingsBlock.Fourth, "Max. Level Size", SettingsBlock.InlineTitle);
 
 		// level custom fields
 		levelValueManager = new ValueTemplateManager(root, [], 'Level Values');
@@ -92,7 +102,9 @@ class ProjectGeneralPanel extends ProjectEditorPanel
 		Fields.setField(playCommand, OGMO.project.playCommand);
 		angleExport.val(OGMO.project.anglesRadians ? "0" : "1");
 		Fields.setVector(layerGridDefaultSize, OGMO.project.layerGridDefaultSize);
+		Fields.setVector(levelScreenSize, OGMO.project.levelScreenSize);
 		Fields.setVector(levelMinSize, OGMO.project.levelMinSize);
+		Fields.setVector(levelDefaultSize, OGMO.project.levelDefaultSize);
 		Fields.setVector(levelMaxSize, OGMO.project.levelMaxSize);
 		levelValueManager.inspect(null, false);
 		levelValueManager.values = OGMO.project.levelValues;
@@ -110,7 +122,9 @@ class ProjectGeneralPanel extends ProjectEditorPanel
 		OGMO.project.playCommand = Fields.getField(playCommand);
 		OGMO.project.anglesRadians = angleExport.val() == "0";
 		OGMO.project.layerGridDefaultSize = Fields.getVector(layerGridDefaultSize);
+		OGMO.project.levelScreenSize = Fields.getVector(levelScreenSize);
 		OGMO.project.levelMinSize = Fields.getVector(levelMinSize);
+		OGMO.project.levelDefaultSize = Fields.getVector(levelDefaultSize);
 		OGMO.project.levelMaxSize = Fields.getVector(levelMaxSize);
 		levelValueManager.save();
 		OGMO.project.levelValues = levelValueManager.values;

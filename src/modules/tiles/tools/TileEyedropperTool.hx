@@ -1,5 +1,6 @@
 package modules.tiles.tools;
 
+import level.data.Level;
 import modules.tiles.TileLayer.TileData;
 
 class TileEyedropperTool extends TileTool
@@ -10,15 +11,17 @@ class TileEyedropperTool extends TileTool
 	public var end:Vector = new Vector();
 	public var rect:Rectangle = new Rectangle();
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (drawing && rect.width > 0 && rect.height > 0)
 		{
+			var offset = level.data.offset;
+
 			var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 			var w = rect.width * layer.template.gridSize.x;
 			var h = rect.height * layer.template.gridSize.y;
 
-			EDITOR.overlay.drawRect(at.x, at.y, w, h, Color.white.x(0.25));
+			EDITOR.overlay.drawRect(at.x + offset.x, at.y + offset.y, w, h, Color.white.x(0.5));
 		}
 	}
 

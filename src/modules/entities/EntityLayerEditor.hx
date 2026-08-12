@@ -1,5 +1,6 @@
 package modules.entities;
 
+import level.data.Level;
 import level.editor.ui.PropertyDisplay.PropertyDisplayMode;
 import level.editor.ui.SidePanel;
 import level.editor.LayerEditor;
@@ -46,6 +47,11 @@ class EntityNodeID
 	{
 		return entityID != ENTITY_NONE_ID;
 	}
+
+	public function isRoot(): Bool
+	{
+		return nodeIdx == ROOT_NODE_ID;
+	}
 }
 
 class EntityLayerEditor extends LayerEditor
@@ -54,7 +60,7 @@ class EntityLayerEditor extends LayerEditor
 	public var hovered:EntityGroup = new EntityGroup();
 	public var hoveredNode:EntityNodeID = new EntityNodeID();
 	public var brush:Int = -1;
-	public var entities(get, never):EntityList;
+	//public var entities(get, never):EntityList;
 
 	private var entityTexts = new Map<Int, FloatingHTMLPropertyDisplay>();
 
@@ -64,12 +70,17 @@ class EntityLayerEditor extends LayerEditor
 		brush = 0;
 	}
 
-	override function draw()
+	override function draw(level: Level)
 	{
+		var offx = level.data.offset.x;
+		var offy = level.data.offset.y;
+
+		var entities = getEntities(level);
+
 		// Draw Hover
 		if (active && hovered.amount > 0)
 		{
-			for (ent in entities.getGroup(hovered)) ent.drawHoveredBox();
+			for (ent in entities.getGroup(hovered)) ent.drawHoveredBox(level);
 		}
 		if (active && hoveredNode.isSet())
 		{
@@ -78,24 +89,37 @@ class EntityLayerEditor extends LayerEditor
 			{
 				var nodePos = hoveredNode.getNodePosition(ent);
 				if (nodePos != null)
-					ent.drawHoveredNodeBox(nodePos);
+				{
+					if (nodePos == ent.position) ent.drawHoveredBox(level, nodePos);
+					else ent.drawHoveredNodeBox(level, nodePos);
+				}
 			}
 		}
 
+		drawEntities(offx, offy, entities);
+	}
+
+	override function drawNoHover(level: Level)
+	{
+		drawEntities(level.data.offset.x, level.data.offset.y, getEntities(level));
+	}
+
+	private function drawEntities(offx:Float, offy:Float, entities:EntityList)
+	{
 		// Draw Entities
 		var hasNodes:Array<Entity> = [];
 		for (ent in entities.list)
 		{
-			ent.draw();
+			ent.drawOffset(offx, offy);
 			if (!active && ent.canDrawNodes) hasNodes.push(ent);
 		}
 
 		// Draw node lines
-		if (hasNodes.length > 0) for (ent in hasNodes) ent.drawNodeLines();
+		if (hasNodes.length > 0) for (ent in hasNodes) ent.drawNodeLinesOffset(offx, offy);
 
 		// Draw entity property display texts
 		{
-			FloatingHTMLPropertyDisplay.visibleFade = EDITOR.level.zoom >= OGMO.settings.propertyDisplay.minimumZoom;
+			FloatingHTMLPropertyDisplay.visibleFade = EDITOR.zoom >= OGMO.settings.propertyDisplay.minimumZoom;
 			FloatingHTMLPropertyDisplay.visible = OGMO.settings.propertyDisplay.visible;
 
 			for (ent in entities.list)
@@ -116,7 +140,8 @@ class EntityLayerEditor extends LayerEditor
 				var entity = entities.getByID(id);
 				if (entity != null)
 				{
-					var corners = entity.getCorners(entity.position, 8 / EDITOR.level.zoom);
+					var offsetPos = new Vector(offx + entity.position.x, offy + entity.position.y);
+					var corners = entity.getCorners(offsetPos, 8 / EDITOR.zoom);
 					var avgX = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4.0;
 					var minY = Math.min(Math.min(corners[0].y, corners[1].y), Math.min(corners[2].y, corners[3].y));
 
@@ -137,16 +162,16 @@ class EntityLayerEditor extends LayerEditor
 		}
 	}
 
-	override function drawAbove()
+	override function drawAbove(level: Level)
 	{
 		// Draw Nodes
-		for (ent in entities.list) if (ent.canDrawNodes) ent.drawNodeLines();
+		for (ent in getEntities(level).list) if (ent.canDrawNodes) ent.drawNodeLines(level);
 	}
 
-	override function drawOverlay()
+	override function drawOverlay(level: Level)
 	{
 		if (selection.amount <= 0) return;
-		for (entity in entities.getGroup(selection)) entity.drawSelectionBox();
+		for (entity in getEntities(level).getGroup(selection)) entity.drawSelectionBox(level);
 	}
 
 	override function loop()
@@ -168,7 +193,7 @@ class EntityLayerEditor extends LayerEditor
 	
 	override function createSelectionPanel():SidePanel return new EntitySelectionPanel(this);
 
-	override function afterUndoRedo() selection.trim(entities);
+	override function afterUndoRedo(level: Level) selection.trim(getEntities(level));
 
 	public var brushTemplate(get, never):EntityTemplate;
 	function get_brushTemplate():EntityTemplate return OGMO.project.getEntityTemplate(brush);
@@ -182,17 +207,18 @@ class EntityLayerEditor extends LayerEditor
 		{
 			case Keys.Backspace, Keys.Delete:
 				if (selection.amount <= 0) return;
-				EDITOR.level.store('delete entities');
+				EDITOR.currentLevel.store('delete entities');
 				EDITOR.dirty();
-				entities.removeAndClearGroup(selection);
+				getEntitiesFromCurrentLevel().removeAndClearGroup(selection);
 			case Keys.A:
 				if (!OGMO.ctrl) return;
-				selection.set(entities.list);
+				selection.set(getEntitiesFromCurrentLevel().list);
 				EDITOR.dirty();
 			case Keys.D:
 				if (!OGMO.ctrl || selection.amount <= 0) return;
-				EDITOR.level.store('duplicate entities');
-				var copies:Array<Entity> = [ for (e in entities.getGroup(selection)) e.duplicate(layer.downcast(EntityLayer).nextID(), template.gridSize.x * 2, template.gridSize.y * 2) ];
+				EDITOR.currentLevel.store('duplicate entities');
+				var entities = getEntitiesFromCurrentLevel();
+				var copies:Array<Entity> = [ for (e in entities.getGroup(selection)) e.duplicate(getLayerFromCurrentLevel().downcast(EntityLayer).nextID(), template.gridSize.x * 2, template.gridSize.y * 2) ];
 				entities.addList(copies);
 				if (OGMO.shift) selection.add(copies);
 				else selection.set(copies);
@@ -200,13 +226,14 @@ class EntityLayerEditor extends LayerEditor
 			case Keys.F:
 				// Swap selected entities' positions with their first nodes
 				if (!OGMO.ctrl || !OGMO.shift || selection.amount <= 0) return;
+				var entities = getEntitiesFromCurrentLevel();
 				var swapped = false;
 				for (e in entities.getGroup(selection))
 				{
 					if (!swapped)
 					{
 						swapped = true;
-						EDITOR.level.store('swap entity and first node positions');
+						EDITOR.currentLevel.store('swap entity and first node positions');
 						EDITOR.dirty();
 					}
 					var temp = e.position;
@@ -215,24 +242,37 @@ class EntityLayerEditor extends LayerEditor
 				}
 			case Keys.H:
 				if (OGMO.ctrl || selection.amount <= 0) return;
-				EDITOR.level.store("flip entity h");
-				for (e in entities.getGroup(selection)) if (e.template.canFlipX) e.flippedX = !e.flippedX;
+				EDITOR.currentLevel.store("flip entity h");
+				for (e in getEntitiesFromCurrentLevel().getGroup(selection)) if (e.template.canFlipX) e.flippedX = !e.flippedX;
 				selection.changed = true;
 				EDITOR.dirty();
 			case Keys.V:
 				if (OGMO.ctrl || selection.amount <= 0) return;
-				EDITOR.level.store("flip entity v");
-				for (e in entities.getGroup(selection)) if (e.template.canFlipY) e.flippedY = !e.flippedY;
+				EDITOR.currentLevel.store("flip entity v");
+				for (e in getEntitiesFromCurrentLevel().getGroup(selection)) if (e.template.canFlipY) e.flippedY = !e.flippedY;
 				selection.changed = true;
 				EDITOR.dirty();
 		}
 	}
 
 	// endregion
-	inline function get_entities():EntityList {
-		var el:EntityLayer = cast layer;
+
+	public function getEntities(level: Level): EntityList
+	{
+		var el: EntityLayer = cast getLayer(level);
 		return el.entities;
 	}
+
+	public function getEntitiesFromCurrentLevel(): EntityList
+	{
+		var el: EntityLayer = cast getLayerFromCurrentLevel();
+		return el.entities;
+	}
+
+	/*inline function get_entities():EntityList {
+		var el:EntityLayer = cast layer;
+		return el.entities;
+	}*/
 
 	override  function set_visible(newVisible:Bool):Bool {
 		if (!newVisible)

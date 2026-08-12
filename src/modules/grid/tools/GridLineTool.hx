@@ -1,5 +1,7 @@
 package modules.grid.tools;
 
+import level.data.Level;
+
 class GridLineTool extends GridTool
 {
 	public var drawing:Bool = false;
@@ -8,9 +10,12 @@ class GridLineTool extends GridTool
 	public var end:Vector = new Vector();
 	public var points:Array<Vector>;
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (!drawing) return;
+
+		var offset = level.data.offset;
+
 		for (p in points)
 		{
 			if (layer.insideGrid(p))
@@ -23,7 +28,7 @@ class GridLineTool extends GridTool
 					col = Color.red;
 				col = col.x(0.5);
 
-				EDITOR.overlay.drawRect(at.x, at.y, w, h, col);
+				EDITOR.overlay.drawRect(at.x + offset.x, at.y + offset.y, w, h, col);
 			}
 		}
 	}
@@ -83,8 +88,10 @@ class GridLineTool extends GridTool
 	public function doDraw()
 	{
 		if (!anyChanges) return;
-		EDITOR.level.store("line fill");
+		EDITOR.currentLevel.store("line fill");
 		for (p in points) if (layer.insideGrid(p)) layer.data[p.x.int()][p.y.int()] = brush;
+
+		layer.signalForAutotiler();
 	}
 
 	public function updateLine()

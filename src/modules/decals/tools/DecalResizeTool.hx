@@ -1,5 +1,7 @@
 package modules.decals.tools;
 
+import level.data.Level;
+
 class DecalResizeTool extends DecalTool
 {
 
@@ -12,13 +14,17 @@ class DecalResizeTool extends DecalTool
 	public var canResizeX:Bool = false;
 	public var canResizeY:Bool = false;
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (!resizing) return;
-		EDITOR.overlay.drawLine(start, mousePos, Color.white);
-		EDITOR.overlay.drawLineNode(start, 10 / EDITOR.level.zoom, Color.green);
-		if (canResizeX) EDITOR.overlay.drawLine(start, new Vector(lastPos.x, start.y), Color.green);
-		if (canResizeY) EDITOR.overlay.drawLine(start, new Vector(start.x, lastPos.y), Color.green);
+		var offset = level.data.offset;
+		var drawStart = start.clone().add(offset);
+		var drawMouse = mousePos.clone().add(offset);
+		var drawLast = lastPos.clone().add(offset);
+		EDITOR.overlay.drawLine(drawStart, drawMouse, Color.white);
+		EDITOR.overlay.drawLineNode(drawStart, 10 / EDITOR.zoom, Color.green);
+		if (canResizeX) EDITOR.overlay.drawLine(drawStart, new Vector(drawLast.x, drawStart.y), Color.green);
+		if (canResizeY) EDITOR.overlay.drawLine(drawStart, new Vector(drawStart.x, drawLast.y), Color.green);
 	}
 
 	override public function onMouseDown(pos:Vector)
@@ -52,7 +58,7 @@ class DecalResizeTool extends DecalTool
 		{
 			if (!changed)
 			{
-				EDITOR.level.store("resize decals");
+				EDITOR.currentLevel.store("resize decals");
 				changed = true;
 			}
 			decal.scale.set(1, 1);
@@ -71,13 +77,14 @@ class DecalResizeTool extends DecalTool
 		}
 
 		if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+		else layer.snapToPixel(pos, pos);
 
 		if (!pos.equals(lastPos))
 		{
 			if (!firstChange)
 			{
 				firstChange = true;
-				EDITOR.level.store("resize decals");
+				EDITOR.currentLevel.store("resize decals");
 			}
 
 			for (d in decals) d.resize(new Vector(pos.x - lastPos.x, pos.y - lastPos.y));

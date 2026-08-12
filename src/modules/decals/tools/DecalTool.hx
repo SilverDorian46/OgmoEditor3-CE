@@ -8,5 +8,5 @@ class DecalTool extends Tool
 	function get_layerEditor():DecalLayerEditor return cast EDITOR.currentLayerEditor;
 
 	public var layer(get, never):DecalLayer;
-	function get_layer():DecalLayer return cast EDITOR.level.currentLayer;
+	function get_layer():DecalLayer return cast EDITOR.currentLevel.currentLayer;
 }

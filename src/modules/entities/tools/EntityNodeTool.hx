@@ -1,5 +1,6 @@
 package modules.entities.tools;
 
+import level.data.Level;
 import modules.entities.EntityLayerEditor.EntityNodeID;
 
 class LineProjectionData
@@ -34,12 +35,13 @@ class EntityNodeTool extends EntityTool
 	private var closestProjection:LineProjectionData = null;
 	private var lastClosestProjection:LineProjectionData = null;
 
-	override function drawOverlay()
+	override function drawOverlay(level: Level)
 	{
 		if (closestProjection != null && closestProjection.active())
 		{
-			var x = closestProjection.projection.x;
-			var y = closestProjection.projection.y;
+			var offset = level.data.offset;
+			var x = closestProjection.projection.x + offset.x;
+			var y = closestProjection.projection.y + offset.y;
 			var size = 8.0;
 			EDITOR.overlay.drawRect(x - size / 2.0, y - size / 2.0, size, size, Color.green.x(0.5));
 		}
@@ -53,19 +55,20 @@ class EntityNodeTool extends EntityTool
 		var foundOne = false;
 		for (e in entities)	// Find hovered node
 		{
-			if (e.checkPoint(pos))
-			{
-				foundOne = true;
-				if (layerEditor.hoveredNode.set(e.id, EntityNodeID.ROOT_NODE_ID))
-					EDITOR.dirty();
-				break;
-			}
-
 			var nodeIdx = e.getNodeAt(pos);
 			if (nodeIdx != null)
 			{
 				foundOne = true;
 				if (layerEditor.hoveredNode.set(e.id, nodeIdx))
+					EDITOR.dirty();
+				break;
+			}
+
+			// root node (the entity itself) has lower priority in case of overlap
+			if (e.checkPoint(pos))
+			{
+				foundOne = true;
+				if (layerEditor.hoveredNode.set(e.id, EntityNodeID.ROOT_NODE_ID))
 					EDITOR.dirty();
 				break;
 			}
@@ -120,6 +123,7 @@ class EntityNodeTool extends EntityTool
 		if (editing.length > 0)
 		{
 			if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 			if (!pos.equals(lastPos))
 			{
 				for (p in editing)
@@ -145,20 +149,20 @@ class EntityNodeTool extends EntityTool
 		if (entities.length > 0)
 		{
 			EDITOR.locked = true;
-			EDITOR.level.store("add node(s)");
+			EDITOR.currentLevel.store("add node(s)");
 
 			//Look for an existing entity or node
 			for (e in entities)
 			{
-				if (e.checkPoint(pos))
-					editing.push(e.position);
-
 				var nodeIdx = e.getNodeAt(pos);
 				if (nodeIdx != null)
 					editing.push(e.nodes[nodeIdx]);
+				else if (e.checkPoint(pos))
+					editing.push(e.position);
 			}
 
 			if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 
 			//If no existing nodes, create them
 			if (editing.length == 0)
@@ -171,6 +175,7 @@ class EntityNodeTool extends EntityTool
 						{
 							var n = closestProjection.projection.clone();
 							if (!OGMO.ctrl) layer.snapToGrid(n, n);
+							else layer.snapToPixel(n, n);
 							e.nodes.insert(closestProjection.nodeIdx, n);
 							editing.push(n);
 						}
@@ -204,6 +209,7 @@ class EntityNodeTool extends EntityTool
 		//Look for an existing node
 		for (e in entities)
 		{
+			if (!e.canRemoveNode) continue;
 			var nodeIdx = e.getNodeAt(pos);
 			if (nodeIdx != null) nodes.push({ entity: e, node: e.nodes[nodeIdx] });
 		}
@@ -211,7 +217,7 @@ class EntityNodeTool extends EntityTool
 		// delete them
 		if (nodes.length > 0)
 		{
-			EDITOR.level.store("deleted node");
+			EDITOR.currentLevel.store("deleted node");
 			for (n in nodes)
 			{
 				var entity:Entity = n.entity;
@@ -228,7 +234,7 @@ class EntityNodeTool extends EntityTool
 	override public function getName():String return "Add Node";
 	override public function keyToolAlt():Int return 1;
 	override function isAvailable():Bool {
-		for (entity in layerEditor.entities.list) {
+		for (entity in layerEditor.getEntitiesFromCurrentLevel().list) {
 			for (e_id in layerEditor.selection.ids) if (entity.id == e_id && entity.template.hasNodes) return true;
 		}
 		return false;

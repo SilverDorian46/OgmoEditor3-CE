@@ -1,5 +1,6 @@
 package modules.tiles.tools;
 
+import level.data.Level;
 import modules.tiles.TileLayer.TileData;
 import modules.tiles.tools.TileTool;
 
@@ -19,27 +20,29 @@ class TileSelectTool extends TileTool
 		deselectTiles();
 	}
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		switch (mode) {
-			case Select, None: selectOverlay();
-			case Move: moveOverlay();
+			case Select, None: selectOverlay(level);
+			case Move: moveOverlay(level);
 		}
 	}
 
-	function selectOverlay()
+	function selectOverlay(level: Level)
 	{
 		if (rect.width <= 0 || rect.height <= 0) return;
+		var offset = level.data.offset;
 		var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 		var w = rect.width * layer.template.gridSize.x;
 		var h = rect.height * layer.template.gridSize.y;
-		EDITOR.overlay.drawRect(at.x, at.y, w, h, Color.green.x(0.1));
-		EDITOR.overlay.drawRectLines(at.x, at.y, w, h, Color.green);		
+		EDITOR.overlay.drawRect(at.x + offset.x, at.y + offset.y, w, h, Color.green.x(0.2));
+		EDITOR.overlay.drawRectLines(at.x + offset.x, at.y + offset.y, w, h, Color.green);		
 	}
 
-	function moveOverlay()
+	function moveOverlay(level: Level)
 	{
 		if (rect.width <= 0 || rect.height <= 0) return;
+		var offset = level.data.offset;
 		var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 		var trueAt = layer.gridToLevel(new Vector(freeRect.x, freeRect.y));
 		var w = rect.width * layer.template.gridSize.x;
@@ -53,15 +56,15 @@ class TileSelectTool extends TileTool
 			if (!layer.insideGrid(new Vector(freeRect.x + x, freeRect.y + y))) continue;
 			if (tile.isEmptyTile())
 			{
-				if (!OGMO.ctrl) EDITOR.overlay.drawRect(cur.x, cur.y, layer.template.gridSize.x, layer.template.gridSize.y, Color.red.x(0.2));
+				if (!OGMO.ctrl) EDITOR.overlay.drawRect(cur.x, cur.y, layer.template.gridSize.x, layer.template.gridSize.y, Color.red.x(0.4));
 				continue;
 			}
-			EDITOR.overlay.drawRect(cur.x, cur.y, layer.template.gridSize.x, layer.template.gridSize.y, Color.red.x(0.25));
-			EDITOR.overlay.drawTile(cur.x, cur.y, layer.tileset, tile);
+			EDITOR.overlay.drawRect(cur.x + offset.x, cur.y + offset.y, layer.template.gridSize.x, layer.template.gridSize.y, Color.red.x(0.5));
+			EDITOR.overlay.drawTile(cur.x + offset.x, cur.y + offset.y, layer.tileset, tile);
 			trace('\n at: ${at.x} / ${at.y} \n cur: ${cur.x} / ${cur.y}');
 		}
 		//EDITOR.overlay.setAlpha(1);
-		EDITOR.overlay.drawRectLines(at.x - 2, at.y - 2, w + 4, h + 4, Color.yellow);
+		EDITOR.overlay.drawRectLines(at.x + offset.x - 2, at.y + offset.y - 2, w + 4, h + 4, Color.yellow);
 	}
 
 	override public function onMouseDown(pos:Vector)
@@ -81,7 +84,7 @@ class TileSelectTool extends TileTool
 
 	function moveStart(pos:Vector)
 	{
-		EDITOR.level.store('move tiles');
+		EDITOR.currentLevel.store('move tiles');
 		layer.levelToGrid(pos, pos);
 		pos.clone(lastPos);
 		mode = Move;

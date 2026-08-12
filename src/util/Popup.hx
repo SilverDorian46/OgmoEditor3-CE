@@ -198,6 +198,117 @@ class Popup
 	}
 
 	/* --------------------------------- */
+	/* ------ TEXT FIELD + VECTOR ------ */
+	/* --------------------------------- */
+
+	public static function openTextVector(label:String, icon:String, defaultText:String, defaultVector:Vector, acceptText:String, cancelText:String, callback: String->Vector->Void, ?defaultSelectStart:Int, ?defaultSelectEnd:Int):Void
+	{
+		Popup.closePopups();
+		RightClickMenu.closeMenu();
+
+		if (defaultSelectStart == null) defaultSelectStart = 0;
+		if (defaultSelectEnd == null) defaultSelectEnd = defaultText.length;
+
+		var overlay = new JQuery('<div class="overlay">');
+		var win = new JQuery('<div class="popupWindow">');
+		var title = new JQuery('<div class="title">');
+		var content = new JQuery('<div class="content">');
+		var input:JQuery = null;
+		var settings:JQuery = null;
+		var vector:JQuery = null;
+		var event:Event->Void = null;
+
+		function close(escape:Bool)
+		{
+			var str:String = null;
+			var value:Vector;
+			if (!escape)
+			{
+				str = input.val();
+				value = Fields.getVector(vector);
+			}
+			else
+				value = new Vector();
+
+			overlay.remove();
+			new JQuery(Browser.window).unbind('keyup', event);
+			OGMO.onPopupEnd();
+
+			if (callback != null) callback(str, value);
+		}
+
+		event = function(e:Event)
+		{
+			if (e.which == Keys.Enter || e.which == Keys.Escape)
+			{
+				close(e.which == Keys.Escape);
+			}
+		}
+
+		// title part
+		win.append(title);
+		{
+			if (icon.length > 0) title.append('<div class="icon icon-' + icon + '"></div>');
+			title.append('<div class="label">' + label + '</div>');
+
+			//Close Button
+			{
+				var closeButton = new JQuery('<div class="close icon icon-no"></div>');
+				closeButton.on("click", function() { close(true); });
+				title.append(closeButton);
+			}
+		}
+
+		// content part
+		win.append(content);
+		{
+			input = new JQuery('<input class="popupTextInput" value="' + defaultText + '"></input>');
+
+			settings = new JQuery('<div class="settings">');
+			vector = Fields.createVector(defaultVector);
+			Fields.createSettingsBlock(settings, vector, SettingsBlock.Full, "Offset", SettingsBlock.OverTitle);
+
+			var btns = new JQuery('<div class="buttons"></div>');
+
+			var options = [acceptText, cancelText];
+			for (i in 0...options.length)
+			{
+				var current = i;
+				var button = Fields.createButton("", options[i], btns);
+				button.on("click", function() { close(current != 0); });
+				if (i == 0) button.addClass("important");
+			}
+
+			content.append(input);
+			content.append(settings);
+			content.append(btns);
+		}
+
+		// show
+		overlay.append(win);
+		overlay.css("background-color", "rgba(0,0,0,0.5)");
+		overlay.hide();
+		overlay.fadeIn(150);
+		new JQuery("body").append(overlay);
+
+		// window offset
+		win.offset({
+				left: (new JQuery(Browser.window).width() - win.width()) / 2,
+				top: (new JQuery(Browser.window).height() - win.height()) / 2
+		});
+
+		new JQuery(Browser.window).on('keyup', event);
+		OGMO.onPopupStart();
+		input.focus();
+
+		//Selection
+		var ele:InputElement = cast input[0];
+		ele.setSelectionRange(defaultSelectStart, defaultSelectEnd);
+
+		Popup.makeDraggable(overlay, win, title);
+	}
+
+	/* --------------------------------- */
 	/* ----- TEXT FIELD + DROPDOWN ----- */
 	/* --------------------------------- */
 
@@ -273,6 +384,111 @@ class Popup
 
 			content.append(input);
 			content.append(dropdown);
+			content.append(btns);
+		}
+
+		// show
+		overlay.append(win);
+		overlay.css("background-color", "rgba(0,0,0,0.5)");
+		overlay.hide();
+		overlay.fadeIn(150);
+		new JQuery("body").append(overlay);
+
+		// window offset
+		win.offset({
+				left: (new JQuery(Browser.window).width() - win.width()) / 2,
+				top: (new JQuery(Browser.window).height() - win.height()) / 2
+		});
+
+		new JQuery(Browser.window).on('keyup', event);
+		OGMO.onPopupStart();
+		input.focus();
+
+		Popup.makeDraggable(overlay, win, title);
+	}
+
+	/* -------------------------------------- */
+	/* ----- TEXT FIELD + TWO DROPDOWNS ----- */
+	/* -------------------------------------- */
+
+	public static function openTextTwoDropdowns(label: String, icon: String, defaultText: String, firstDropdownOptions: Array<String>, secondDropdownOptions: Array<String>, acceptText: String, cancelText: String, callback: (String, Int, Int) -> Void): Void
+	{
+		Popup.closePopups();
+		RightClickMenu.closeMenu();
+
+		var overlay = new JQuery('<div class="overlay">');
+		var win = new JQuery('<div class="popupWindow">');
+		var title = new JQuery('<div class="title">');
+		var content = new JQuery('<div class="content">');
+		var input:JQuery = null;
+		var firstDropdown:JQuery = null;
+		var secondDropdown:JQuery = null;
+		var event:Event->Void = null;
+
+		function close(escape:Bool)
+		{
+			var str:String = null;
+			var firstIndex = -1;
+			var secondIndex = -1;
+			if (!escape)
+			{
+				str = input.val();
+				firstIndex = firstDropdown.val();
+				secondIndex = secondDropdown.val();
+			}
+
+			overlay.remove();
+			new JQuery(Browser.window).unbind('keyup', event);
+			OGMO.onPopupEnd();
+
+			if (callback != null) callback(str, firstIndex, secondIndex);
+		}
+
+		event = function(e:Event)
+		{
+			if (e.which == Keys.Enter || e.which == Keys.Escape)
+			{
+				close(e.which == Keys.Escape);
+			}
+		}
+
+		// title part
+		win.append(title);
+		{
+			if (icon.length > 0) title.append('<div class="icon icon-' + icon + '"></div>');
+			title.append('<div class="label">' + label + '</div>');
+
+			//Close Button
+			{
+				var closeButton = new JQuery('<div class="close icon icon-no"></div>');
+				closeButton.on("click", function() { close(true); });
+				title.append(closeButton);
+			}
+		}
+
+		// content part
+		win.append(content);
+		{
+			input = new JQuery('<input class="popupTextInput" style="width: 50%; float: right;" value="' + defaultText + '"></input>');
+			firstDropdown = new JQuery('<select class="popupSelectInput" style="width: 25%; height: 34px; float: left;"></select>');
+			for (i in 0...firstDropdownOptions.length) new JQuery('<option />', {value: i, text: firstDropdownOptions[i] }).appendTo(firstDropdown);
+			secondDropdown = new JQuery('<select class="popupSelectInput" style="width: 25%; height: 34px; float: left;"></select>');
+			for (i in 0...secondDropdownOptions.length) new JQuery('<option />', {value: i, text: secondDropdownOptions[i] }).appendTo(secondDropdown);
+
+			var btns = new JQuery('<div class="buttons"></div>');
+
+			var options = [acceptText, cancelText];
+			for (i in 0...options.length)
+			{
+				var current = i;
+				var button = Fields.createButton("", options[i], btns);
+				button.on("click", function() { close(current != 0); });
+				if (i == 0) button.addClass("important");
+			}
+
+			content.append(input);
+			content.append(firstDropdown);
+			content.append(secondDropdown);
 			content.append(btns);
 		}
 
@@ -390,7 +606,7 @@ class Popup
 	/* --------- COLOR PICKER ---------- */
 	/* --------------------------------- */
 
-	public static function openColorPicker(label:String, color:Color, callback:Color->Void):Void
+	public static function openColorPicker(label:String, color:Color, callback:Color->Void, alpha:Bool, hashtag:Bool):Void
 	{
 		Popup.closePopups();
 		RightClickMenu.closeMenu();
@@ -403,6 +619,9 @@ class Popup
 		// current color
 		var initialColor = color.clone();
 		var event:Event->Void = null;
+
+		if (!alpha)
+			color.a = 1;
 
 		function close(result:Color)
 		{
@@ -469,14 +688,14 @@ class Popup
 			var noalpha = new Color(color.r, color.g, color.b, 1);
 
 			// fields
-			if (updateHex) hex.val(color.toHex());
+			if (updateHex) hex.val(color.toHex(hashtag));
 
 			if (updateRGBA)
 			{
 				r.val(Math.round(color.r * 255));
 				g.val(Math.round(color.g * 255));
 				b.val(Math.round(color.b * 255));
-				a.val(Math.round(color.a * 255));
+				a.val(alpha ? Math.round(color.a * 255) : 255);
 			}
 
 			if (updateHSV)
@@ -564,7 +783,7 @@ class Popup
 
 		// construct all the fields
 		hex = field("hex", "", updateFromHex);
-		a = field("a", "A", updateFromRGBA);
+		if (alpha) a = field("a", "A", updateFromRGBA);
 		r = field("r", "R", updateFromRGBA);
 		g = field("g", "G", updateFromRGBA);
 		b = field("b", "B", updateFromRGBA);
@@ -580,9 +799,12 @@ class Popup
 		hue.on("mousedown", function(e) { dragHue = true; updateDragging(e); });
 		fields.append(hue);
 
-		transparency = new JQuery('<div class="transparency"><div class="color"></div><div class="cursor"></div></div>');
-		transparency.on("mousedown", function(e) { dragAlpha = true; updateDragging(e); });
-		fields.append(transparency);
+		if (alpha)
+		{
+			transparency = new JQuery('<div class="transparency"><div class="color"></div><div class="cursor"></div></div>');
+			transparency.on("mousedown", function(e) { dragAlpha = true; updateDragging(e); });
+			fields.append(transparency);
+		}
 
 		view = new JQuery('<div class="view"><div class="color"></div><div class="from"></div></div>');
 		fields.append(view);
@@ -647,16 +869,26 @@ class Popup
 		var content = new JQuery('<div class="content">');
 		var event:Event->Void = null;
 		var levelOffset:JQuery = null;
+		var levelSize:JQuery = null;
 
 		function close(escape:Bool)
 		{
 			var offset = Fields.getVector(levelOffset);
 			if (!level.data.offset.equals(offset))
 			{
-				level.store("Changed Level Offset from '" + level.data.offset.toString() + "'	to '" + offset.toString() + "'");
+				level.store("Changed Level Offset from '" + level.data.offset.toString() + "' to '" + offset.toString() + "'");
 				level.data.offset = offset;
 				level.unsavedChanges = true;
 			}
+
+			var size = Fields.getVector(levelSize);
+			if (!level.data.size.equals(size))
+			{
+				level.store("Changed Level Size from '" + level.data.size.toString() + "' to '" + size.toString() + "'");
+				level.resize(size, new Vector());
+				level.unsavedChanges = true;
+			}
+
 			overlay.remove();
 			new JQuery(Browser.window).unbind('keyup', event);
 			OGMO.onPopupEnd();
@@ -678,6 +910,10 @@ class Popup
 		// add level offsets
 		levelOffset = Fields.createVector(new Vector(level.data.offset.x, level.data.offset.y));
 		Fields.createSettingsBlock(settings, levelOffset, SettingsBlock.Full, "Level Offset", SettingsBlock.OverTitle);
+
+		// add level size
+		levelSize = Fields.createVector(new Vector(level.data.size.x, level.data.size.y));
+		Fields.createSettingsBlock(settings, levelSize, SettingsBlock.Full, "Level Size", SettingsBlock.OverTitle);
 
 		if (level.values.length > 0) Fields.createLineBreak(settings);
 

@@ -198,13 +198,15 @@ class Imports
 		PROJECT
 	*/
 
-	public static function project(path:String): Project
+	public static function project(path:String, onReturn: Project -> Void): Void
 	{
-		var proj = new Project(path);
-		proj.load(FileSystem.loadJSON(path));
+		Project.createNew(path, (proj) ->
+		{
+			proj.load(FileSystem.loadJSON(path));
+			OGMO.settings.registerProject(proj);
 
-		OGMO.settings.registerProject(proj);
-		return proj;
+			onReturn(proj);
+		});
 	}
 
 	/*

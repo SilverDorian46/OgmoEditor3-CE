@@ -6,6 +6,8 @@ import level.editor.value.FieldValueEditor;
 import level.editor.value.ValueEditor;
 import level.data.Value;
 
+using StringTools;
+
 class StringValueTemplate extends ValueTemplate
 {
 	public static function startup()
@@ -29,8 +31,12 @@ class StringValueTemplate extends ValueTemplate
 
 	override function validate(val:Dynamic):String
 	{
-		//TODO!!
-		return val.string();
+		var str = val.string();
+		if (trimWhitespace)
+			str = str.trim();
+		if (maxLength > 0)
+			str = str.substr(0, maxLength);
+		return str;
 	}
 
 	override function createEditor(values:Array<Value>):ValueEditor

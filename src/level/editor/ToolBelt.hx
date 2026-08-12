@@ -87,7 +87,7 @@ class ToolBelt
 	{
 		if (force == null) force = false;
 
-		var layer = EDITOR.level.currentLayer.template.definition.id;
+		var layer = EDITOR.currentLevel.currentLayer.template.definition.id;
 
 		if (id >= 0 && (id != EDITOR.currentLayerEditor.currentTool || force) && id < allTools[layer].length)
 		{
@@ -112,7 +112,7 @@ class ToolBelt
 
 	public function populateToolbar():Void
 	{
-		var tools = allTools[EDITOR.level.currentLayer.template.definition.id];
+		var tools = allTools[EDITOR.currentLevel.currentLayer.template.definition.id];
 		var toolbar = new JQuery(".sticker-toolbar");
 		buttons.resize(0);
 

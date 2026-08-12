@@ -1,5 +1,8 @@
 package modules.decals;
 
+import modules.decals.DecalLayerTemplate.PathTexturePair;
+import rendering.Subtexture;
+import modules.decals.DecalLayerTemplate.Files;
 import js.Browser;
 import level.editor.ui.SidePanel;
 
@@ -7,7 +10,7 @@ class DecalPalettePanel extends SidePanel
 {
 	public var layerEditor: DecalLayerEditor;
 	public var holder:JQuery;
-	public var subdirectory:Dynamic = null;
+	public var subdirectory:Files = null;
 
 	public function new(layerEditor:DecalLayerEditor)
 	{
@@ -55,10 +58,11 @@ class DecalPalettePanel extends SidePanel
 		}
 
 		// add files
-		var textures:Array<Dynamic> = subdirectory.textures;
-		for (texture in textures)
+		var textures:Array<PathTexturePair> = subdirectory.textures;
+		for (texPair in textures)
 		{
-			var img = new JQuery('<img src="' + texture.image.src + '"/>');
+			//var img = new JQuery('<img src="' + texture.image.src + '"/>');
+			var img = new JQuery('<img src="' + texPair.texture.extractImageDataURL() + '"/>');
 			var button = new JQuery('<div class="decal"/>');
 			button.append(img);
 
@@ -70,12 +74,13 @@ class DecalPalettePanel extends SidePanel
 
 			button.on("click", function()
 			{
-				layerEditor.brush = texture;
+				//layerEditor.brush = texture;
+				layerEditor.brush = texPair;
 				holder.find(".decal").removeClass("selected");
 				button.addClass("selected");
 				EDITOR.toolBelt.setTool(1);
 			});
-			if (layerEditor.brush == texture) button.addClass("selected");
+			if (layerEditor.brush == texPair) button.addClass("selected");
 			holder.append(button);
 		}
 	}

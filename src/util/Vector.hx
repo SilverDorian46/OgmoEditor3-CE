@@ -14,6 +14,9 @@ class Vector
 	public var length(get, never):Float;
 	function get_length():Float return Math.sqrt(x * x + y * y);
 
+	public var sqrLength(get, never):Float;
+	function get_sqrLength():Float return x * x + y * y;
+
 	public var angle(get, never):Float;
 	function get_angle():Float return Math.atan2(y, x);
 
@@ -155,6 +158,16 @@ class Vector
 		return result;
 	}
 
+	public function floor(?result:Vector):Vector
+	{
+		if (result == null) result = new Vector();
+
+		result.x = Math.floor(x);
+		result.y = Math.floor(y);
+
+		return result;
+	}
+
 	public static function load(data:Dynamic):Vector
 	{
 		return new Vector(data.x, data.y);
@@ -194,5 +207,10 @@ class Vector
 	public static function midPoint(a:Vector, b:Vector, v:Float = 0.5):Vector
 	{
 		return new Vector(a.x + (b.x - a.x) * v, a.y + (b.y - a.y) * v);
+	}
+
+	public static inline function line(a: Vector, b: Vector): Vector
+	{
+		return new Vector(b.x - a.x, b.y - a.y);
 	}
 }

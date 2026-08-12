@@ -62,7 +62,7 @@ class FieldValueEditor extends ValueEditor
 				var nextValue = template.validate(element.val());
 				if (nextValue != lastValue || conflict)
 				{
-					EDITOR.level.store("Changed " + template.name + " Value from '" + lastValue + "' to '" + nextValue + "'");
+					EDITOR.currentLevel.store("Changed " + template.name + " Value from '" + lastValue + "' to '" + nextValue + "'");
 					for (i in 0...values.length)
 						values[i].value = nextValue;
 					conflict = false;

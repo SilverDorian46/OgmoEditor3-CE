@@ -8,7 +8,8 @@ import util.Fields;
 class FloatValueTemplateEditor extends ValueTemplateEditor
 {
 	public var defaultField:JQuery;
-	public var boundedField:JQuery;
+	public var boundedMinField:JQuery;
+	public var boundedMaxField:JQuery;
 	public var minField:JQuery;
 	public var maxField:JQuery;
 
@@ -23,13 +24,16 @@ class FloatValueTemplateEditor extends ValueTemplateEditor
 		// min / max / bounded
 
 		minField = Fields.createField("Min", floatTemplate.min.string());
-		Fields.createSettingsBlock(into, minField, SettingsBlock.Half75, "Min", SettingsBlock.InlineTitle);
+		Fields.createSettingsBlock(into, minField, SettingsBlock.Fourth, "Min", SettingsBlock.InlineTitle);
+
+		boundedMinField = Fields.createCheckbox(floatTemplate.boundedMin, "Clamp Min");
+		Fields.createSettingsBlock(into, boundedMinField, SettingsBlock.Fourth);
 
 		maxField = Fields.createField("Max", floatTemplate.max.string());
-		Fields.createSettingsBlock(into, maxField, SettingsBlock.Half75, "Max", SettingsBlock.InlineTitle);
+		Fields.createSettingsBlock(into, maxField, SettingsBlock.Fourth, "Max", SettingsBlock.InlineTitle);
 
-		boundedField = Fields.createCheckbox(floatTemplate.bounded, "Clamp");
-		Fields.createSettingsBlock(into, boundedField, SettingsBlock.Fourth);
+		boundedMaxField = Fields.createCheckbox(floatTemplate.boundedMax, "Clamp Max");
+		Fields.createSettingsBlock(into, boundedMaxField, SettingsBlock.Fourth);
 	}
 
 	override function save()
@@ -37,7 +41,8 @@ class FloatValueTemplateEditor extends ValueTemplateEditor
 		var floatTemplate:FloatValueTemplate = cast template;
 
 		floatTemplate.defaults = Imports.float(Fields.getField(defaultField), 0);
-		floatTemplate.bounded = Fields.getCheckbox(boundedField);
+		floatTemplate.boundedMin = Fields.getCheckbox(boundedMinField);
+		floatTemplate.boundedMax = Fields.getCheckbox(boundedMaxField);
 		floatTemplate.min = Imports.float(Fields.getField(minField), 0);
 		floatTemplate.max = Imports.float(Fields.getField(maxField), 100);
 	}

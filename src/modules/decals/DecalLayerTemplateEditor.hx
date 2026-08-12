@@ -11,6 +11,9 @@ class DecalLayerTemplateEditor extends LayerTemplateEditor
 	public var includeImageSequenceField:JQuery;
 	public var scaleable:JQuery;
 	public var rotatable:JQuery;
+	public var colorable:JQuery;
+	public var includeAlpha:JQuery;
+	public var includeHashtag:JQuery;
 	public var folderHolder:JQuery;
 	public var folder:JQuery;
 
@@ -24,10 +27,22 @@ class DecalLayerTemplateEditor extends LayerTemplateEditor
 		// settings
 		includeImageSequenceField = Fields.createCheckbox(decalTemplate.includeImageSequence, "Include Image Sequences");
 		Fields.createSettingsBlock(into, includeImageSequenceField, SettingsBlock.Half);
+
 		scaleable = Fields.createCheckbox(decalTemplate.scaleable, "Scaleable");
 		Fields.createSettingsBlock(into, scaleable, SettingsBlock.Fourth);
+
 		rotatable = Fields.createCheckbox(decalTemplate.rotatable, "Rotatable");
 		Fields.createSettingsBlock(into, rotatable, SettingsBlock.Fourth);
+
+		colorable = Fields.createCheckbox(decalTemplate.canSetColor, "Colorable");
+		Fields.createSettingsBlock(into, colorable, SettingsBlock.Fourth);
+
+		includeAlpha = Fields.createCheckbox(decalTemplate.includeAlpha, "Include Alpha");
+		Fields.createSettingsBlock(into, includeAlpha, SettingsBlock.Fourth);
+
+		includeHashtag = Fields.createCheckbox(decalTemplate.includeHashtag, "Include #");
+		Fields.createSettingsBlock(into, includeHashtag, SettingsBlock.Fourth);
+
 		Fields.createLineBreak(into);
 
 		// folders
@@ -48,6 +63,9 @@ class DecalLayerTemplateEditor extends LayerTemplateEditor
 		decalTemplate.includeImageSequence = Fields.getCheckbox(includeImageSequenceField);
 		decalTemplate.scaleable = Fields.getCheckbox(scaleable);
 		decalTemplate.rotatable = Fields.getCheckbox(rotatable);
+		decalTemplate.canSetColor = Fields.getCheckbox(colorable);
+		decalTemplate.includeAlpha = Fields.getCheckbox(includeAlpha);
+		decalTemplate.includeHashtag = Fields.getCheckbox(includeHashtag);
 		decalTemplate.folder = Fields.getPath(folder);
 
 		// save custom values

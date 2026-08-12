@@ -10,7 +10,7 @@ class TileTool extends Tool
 	function get_layerEditor():TileLayerEditor return cast EDITOR.currentLayerEditor;
 
 	public var layer(get, never):TileLayer;
-	function get_layer():TileLayer return cast EDITOR.level.currentLayer;
+	function get_layer():TileLayer return cast EDITOR.currentLevel.currentLayer;
 	
 	public function brushAt(brush:Array<Array<TileData>>, x:Int, y:Int, ?random:Random):TileData
 	{

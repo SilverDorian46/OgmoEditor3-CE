@@ -15,15 +15,16 @@ class ColorValueTemplate extends ValueTemplate
 
 	public var defaults:Color = new Color();
 	public var includeAlpha:Bool = false;
+	public var includeHashtag:Bool = false;
 
 	override function getHashCode():String
 	{
-		return name + ":co:" + includeAlpha;
+		return name + ":co:" + includeAlpha + ":" + includeHashtag;
 	}
 
 	override function getDefault():String
 	{
-		return defaults.toHexAlpha();
+		return (includeAlpha) ? defaults.toHexAlpha(includeHashtag) : defaults.toHex(includeHashtag);
 	}
 
 	override function validate(val:Dynamic):Int
@@ -44,6 +45,7 @@ class ColorValueTemplate extends ValueTemplate
 		super.load(data);
 		defaults = Color.fromHexAlpha(data.defaults);
 		includeAlpha = data.includeAlpha;
+		includeHashtag = data.includeHashtag;
 	}
 
 	override function save():Dynamic
@@ -51,6 +53,7 @@ class ColorValueTemplate extends ValueTemplate
 		var data:Dynamic = super.save();
 		data.defaults = defaults.toHexAlpha();
 		data.includeAlpha = includeAlpha;
+		data.includeHashtag = includeHashtag;
 		return data;
 	}
 }

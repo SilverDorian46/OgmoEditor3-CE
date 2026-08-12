@@ -1,5 +1,6 @@
 package modules.entities.tools;
 
+import level.data.Level;
 import modules.entities.tools.EntityTool;
 
 class EntitySelectTool extends EntityTool
@@ -12,11 +13,12 @@ class EntitySelectTool extends EntityTool
 	public var end:Vector = new Vector();
 	public var firstChange:Bool = false;
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (start.equals(end)) return;
-		if (mode == Select) EDITOR.overlay.drawRect(start.x, start.y, end.x - start.x, end.y - start.y, Color.green.x(0.2));
-		else if (mode == Delete) EDITOR.overlay.drawRect(start.x, start.y, end.x - start.x, end.y - start.y, Color.red.x(0.2));
+		var offset = level.data.offset;
+		if (mode == Select) EDITOR.overlay.drawRect(start.x + offset.x, start.y + offset.y, end.x - start.x, end.y - start.y, Color.green.x(0.4));
+		else if (mode == Delete) EDITOR.overlay.drawRect(start.x + offset.x, start.y + offset.y, end.x - start.x, end.y - start.y, Color.red.x(0.4));
 	}
 
 	override public function deactivated()
@@ -51,6 +53,7 @@ class EntitySelectTool extends EntityTool
 		mode = Move;
 		firstChange = false;
 		if (!OGMO.ctrl) layer.snapToGrid(start, start);
+		else layer.snapToPixel(start, start);
 		entities = layer.entities.getGroup(layerEditor.selection);
 	}
 
@@ -90,13 +93,14 @@ class EntitySelectTool extends EntityTool
 		else if (mode == Move)
 		{
 			if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 
 			if (!pos.equals(start))
 			{
 				if (!firstChange)
 				{
 					firstChange = true;
-					EDITOR.level.store('move entities');
+					EDITOR.currentLevel.store('move entities');
 				}
 				for (entity in entities) entity.move(new Vector(pos.x - start.x, pos.y - start.y));
 				layerEditor.selection.changed = true;
@@ -131,7 +135,7 @@ class EntitySelectTool extends EntityTool
 		else hit = layer.entities.getRect(Rectangle.fromPoints(start, end));
 		if (hit.length > 0)
 		{
-			EDITOR.level.store('delete entities');
+			EDITOR.currentLevel.store('delete entities');
 			layer.entities.removeList(hit);
 		}
 		mode = None;

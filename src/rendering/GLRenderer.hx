@@ -1,5 +1,7 @@
 package rendering;
 
+import util.Matrix;
+import util.IntRectangle;
 import js.html.CanvasElement;
 import js.lib.Float32Array;
 import js.lib.Uint8Array;
@@ -36,6 +38,7 @@ class GLRenderer
 	var uvs: Array<Float> = [];
 	var currentDrawMode: Int = -1;
 	var currentTexture: Texture = null;
+	var currentBlendState: BlendState = BlendState.alphaBlend;
 	var lastAlpha: Float;
 
 	public function new(name: String, canvas: CanvasElement)
@@ -48,10 +51,12 @@ class GLRenderer
 		// init gl
 		gl = canvas.getContext("webgl");
 		gl.enable(RenderingContext.BLEND);
+		gl.enable(RenderingContext.SAMPLE_ALPHA_TO_COVERAGE);
+		gl.enable(RenderingContext.SAMPLE_COVERAGE);
 		gl.disable(RenderingContext.DEPTH_TEST);
 		gl.disable(RenderingContext.CULL_FACE);
 		gl.clearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
-		gl.blendFunc(RenderingContext.SRC_ALPHA, RenderingContext.ONE_MINUS_SRC_ALPHA);
+		gl.blendFunc(currentBlendState.sfactor, currentBlendState.dfactor);
 
 		posBuffer = gl.createBuffer();
 		colBuffer = gl.createBuffer();
@@ -108,7 +113,7 @@ class GLRenderer
 
 		gl.viewport(0, 0, Math.floor(size.x), Math.floor(size.y));
 		orthoMatrix = Matrix3D.orthographic(0, size.x, 0, size.y, -100, 100);
-		EDITOR.level.camera.setIdentity();
+		EDITOR.camera.setIdentity();
 
 		var canRead = gl.checkFramebufferStatus(RenderingContext.FRAMEBUFFER) == RenderingContext.FRAMEBUFFER_COMPLETE;
 	}
@@ -171,6 +176,21 @@ class GLRenderer
 		}
 	}
 
+	public function getBlendState(): BlendState
+	{
+		return currentBlendState.clone();
+	}
+
+	public function setBlendState(state: BlendState): Void
+	{
+		if (!currentBlendState.equals(state))
+		{
+			finishDrawing();
+			gl.blendFunc(state.sfactor, state.dfactor);
+			currentBlendState = state.clone();
+		}
+	}
+
 	function setDrawMode(newMode: Int): Void
 	{
 		if (currentDrawMode != newMode)
@@ -199,6 +219,11 @@ class GLRenderer
 		}
 	}
 
+	inline function getCurrentPixelRect(): IntRectangle
+	{
+		return (currentTexture != null) ? currentTexture.pixelRect : null;
+	}
+
 	function doDraw(drawMode: Int, texture: Texture): Void
 	{
 		// set up current shader
@@ -214,16 +239,8 @@ class GLRenderer
 			gl.bufferData(RenderingContext.ARRAY_BUFFER, new Float32Array(positions), RenderingContext.STATIC_DRAW);
 		}
 
-		// vertex colors (shape shader)
-		if (texture == null)
-		{
-			gl.enableVertexAttribArray(shader.vertexColorAttribute);
-			gl.bindBuffer(RenderingContext.ARRAY_BUFFER, colBuffer);
-			gl.vertexAttribPointer(shader.vertexColorAttribute, 4, RenderingContext.FLOAT, false, 0, 0);
-			gl.bufferData(RenderingContext.ARRAY_BUFFER, new Float32Array(colors), RenderingContext.STATIC_DRAW);
-		}
 		// vertex uv's (texture shader)
-		else
+		if (texture != null)
 		{
 			gl.activeTexture(RenderingContext.TEXTURE0);
 			gl.bindTexture(RenderingContext.TEXTURE_2D, texture.textures[name]);
@@ -235,6 +252,14 @@ class GLRenderer
 			gl.bufferData(RenderingContext.ARRAY_BUFFER, new Float32Array(uvs), RenderingContext.STATIC_DRAW);
 		}
 
+		// vertex colors
+		{
+			gl.enableVertexAttribArray(shader.vertexColorAttribute);
+			gl.bindBuffer(RenderingContext.ARRAY_BUFFER, colBuffer);
+			gl.vertexAttribPointer(shader.vertexColorAttribute, 4, RenderingContext.FLOAT, false, 0, 0);
+			gl.bufferData(RenderingContext.ARRAY_BUFFER, new Float32Array(colors), RenderingContext.STATIC_DRAW);
+		}
+
 		// Set Matrix Uniforms
 		// TODO no reason for there to be 2 Matrix. Should just multiply Ortho and Camera together and pass that
 		{
@@ -242,7 +267,7 @@ class GLRenderer
 			gl.uniformMatrix4fv(pUniform, false, orthoMatrix.flatten());
 
 			var mvUniform = gl.getUniformLocation(shader.program, "matrix");
-			gl.uniformMatrix3fv(mvUniform, false, EDITOR.level.camera.flatten());
+			gl.uniformMatrix3fv(mvUniform, false, EDITOR.camera.flatten());
 		}
 
 		gl.drawArrays(drawMode, 0, Math.floor(positions.length / 2));
@@ -259,7 +284,7 @@ class GLRenderer
 	var botleft:Vector = new Vector();
 	var botright:Vector = new Vector();
 
-	public function drawTexture(x:Float, y:Float, texture:Texture, ?origin:Vector, ?scale:Vector, ?rotation:Float, ?clipX:Float, ?clipY:Float, ?clipW:Float, ?clipH:Float):Void
+	public function drawTexture(x:Float, y:Float, texture:Texture, ?origin:Vector, ?scale:Vector, ?rotation:Float, ?clipX:Float, ?clipY:Float, ?clipW:Float, ?clipH:Float, ?col:Color):Void
 	{
 		setTexture(texture);
 
@@ -267,6 +292,8 @@ class GLRenderer
 		if (clipY == null) clipY = 0;
 		if (clipW == null) clipW = texture.width;
 		if (clipH == null) clipH = texture.height;
+
+		if (col == null) col = Color.white;
 
 		// relative positions
 		topleft.set(0, 0);
@@ -335,11 +362,97 @@ class GLRenderer
 		uvs.push(uvy + uvh);
 		uvs.push(uvx);
 		uvs.push(uvy + uvh);
+
+		add_color(col, 6);
 	}
 
-	public function drawTile(x:Float, y:Float, tileset:Tileset, tile:TileData): Void
+	public function drawSubtexture(x:Float, y:Float, subtexture:Subtexture, ?origin:Vector, ?scale:Vector, ?rotation:Float, ?clipX:Float, ?clipY:Float, ?clipW:Float, ?clipH:Float, ?col:Color): Void
 	{
-		setTexture(tileset.texture);
+		setTexture(subtexture.texture);
+
+		if (clipX == null) clipX = 0;
+		if (clipY == null) clipY = 0;
+		if (clipW == null) clipW = subtexture.width;
+		if (clipH == null) clipH = subtexture.height;
+
+		if (col == null) col = Color.white;
+
+		// relative positions
+		topleft.set(0, 0);
+		topright.set(clipW, 0);
+		botleft.set(0, clipH);
+		botright.set(clipW, clipH);
+
+		// offset by origin
+		if (origin != null && (origin.x != 0 || origin.y != 0))
+		{
+			topleft.sub(origin);
+			topright.sub(origin);
+			botleft.sub(origin);
+			botright.sub(origin);
+		}
+
+		// scale
+		if (scale != null && (scale.x != 1 || scale.y != 1))
+		{
+			topleft.mult(scale);
+			topright.mult(scale);
+			botleft.mult(scale);
+			botright.mult(scale);
+		}
+
+		// rotate
+		if (rotation != null && rotation != 0)
+		{
+			var s = Math.sin(rotation);
+			var c = Math.cos(rotation);
+			topleft.rotate(s, c);
+			topright.rotate(s, c);
+			botleft.rotate(s, c);
+			botright.rotate(s, c);
+		}
+
+		// push vertices
+		positions.push(x + topleft.x);
+		positions.push(y + topleft.y);
+		positions.push(x + topright.x);
+		positions.push(y + topright.y);
+		positions.push(x + botright.x);
+		positions.push(y + botright.y);
+		positions.push(x + topleft.x);
+		positions.push(y + topleft.y);
+		positions.push(x + botright.x);
+		positions.push(y + botright.y);
+		positions.push(x + botleft.x);
+		positions.push(y + botleft.y);
+
+		// push uvs, pushing them in a small amount to avoid seams
+		var uvx = (subtexture.sourceX + clipX + .01) / subtexture.texture.width;
+		var uvy = (subtexture.sourceY + clipY + .01) / subtexture.texture.height;
+		var uvw = (clipW - .02) / subtexture.texture.width;
+		var uvh = (clipH - .02) / subtexture.texture.height;
+
+		uvs.push(uvx);
+		uvs.push(uvy);
+		uvs.push(uvx + uvw);
+		uvs.push(uvy);
+		uvs.push(uvx + uvw);
+		uvs.push(uvy + uvh);
+		uvs.push(uvx);
+		uvs.push(uvy);
+		uvs.push(uvx + uvw);
+		uvs.push(uvy + uvh);
+		uvs.push(uvx);
+		uvs.push(uvy + uvh);
+
+		add_color(col, 6);
+	}
+
+	public function drawTile(x:Float, y:Float, tileset:Tileset, tile:TileData, ?col:Color): Void
+	{
+		setTexture(tileset.texture.texture);
+
+		if (col == null) col = Color.white;
 
 		var tx = (tile.idx % tileset.tileColumns);
 		var ty = Math.floor(tile.idx / tileset.tileColumns);
@@ -393,11 +506,10 @@ class GLRenderer
 		positions.push(botRight.y);
 
 		// use this to push in the UVs a bit to aVoid seems
-		var texel = new Vector(1 / tileset.width, 1 / tileset.height);
-		var uvx = (tileset.tileSeparationX + tileset.tileMarginX + tx * (tileset.tileWidth + tileset.tileSeparationX)) / tileset.width + texel.x * .01;
-		var uvy = (tileset.tileSeparationY + tileset.tileMarginY + ty * (tileset.tileHeight + tileset.tileSeparationY)) / tileset.height + texel.y * .01;
-		var uvw = tileset.tileWidth / tileset.width - texel.x * .02;
-		var uvh = tileset.tileHeight / tileset.height - texel.y * .02;
+		var uvx = (tileset.texture.sourceX + tileset.tileSeparationX + tileset.tileMarginX + tx * (tileset.tileWidth + tileset.tileSeparationX) + .01) / tileset.texture.texture.width;
+		var uvy = (tileset.texture.sourceY + tileset.tileSeparationY + tileset.tileMarginY + ty * (tileset.tileHeight + tileset.tileSeparationY) + .01) / tileset.texture.texture.height;
+		var uvw = (tileset.tileWidth - .02) / tileset.texture.texture.width;
+		var uvh = (tileset.tileHeight - .02) / tileset.texture.texture.height;
 
 		uvs.push(uvx);
 		uvs.push(uvy);
@@ -411,42 +523,61 @@ class GLRenderer
 		uvs.push(uvy + uvh);
 		uvs.push(uvx + uvw);
 		uvs.push(uvy + uvh);
-	}
-
-	// GEOMETRY
-
-	public function drawRect(x:Float, y:Float, w:Float, h:Float, col:Color):Void
-	{
-		setDrawMode(RenderingContext.TRIANGLES);
-
-		positions.push(x);
-		positions.push(y);
-		positions.push(x + w);
-		positions.push(y);
-		positions.push(x);
-		positions.push(y + h);
-		positions.push(x + w);
-		positions.push(y);
-		positions.push(x);
-		positions.push(y + h);
-		positions.push(x + w);
-		positions.push(y + h);
 
 		add_color(col, 6);
 	}
 
-	public function drawRectLines(x:Float, y:Float, w:Float, h:Float, col:Color)
+	// GEOMETRY
+
+	function internalSetRectUVs(uvx: Float, uvy: Float, uvw: Float, uvh: Float): Void
 	{
-		drawLine(new Vector(x, y), new Vector(x + w, y), col);
-		drawLine(new Vector(x + w, y), new Vector(x + w, y + h), col);
-		drawLine(new Vector(x + w, y + h), new Vector(x, y + h), col);
-		drawLine(new Vector(x, y + h), new Vector(x, y), col);
+		uvs.push(uvx);
+		uvs.push(uvy);
+		uvs.push(uvx + uvw);
+		uvs.push(uvy);
+		uvs.push(uvx);
+		uvs.push(uvy + uvh);
+		uvs.push(uvx + uvw);
+		uvs.push(uvy);
+		uvs.push(uvx);
+		uvs.push(uvy + uvh);
+		uvs.push(uvx + uvw);
+		uvs.push(uvy + uvh);
 	}
 
-	public function drawTriangle(x1:Float, y1:Float, x2:Float, y2:Float, x3:Float, y3:Float, col:Color):Void
+	public function drawRect(x:Float, y:Float, w:Float, h:Float, col:Color):Void
 	{
-		setDrawMode(RenderingContext.TRIANGLES);
+		var pixelRect = getCurrentPixelRect();
+		if (pixelRect == null) setDrawMode(RenderingContext.TRIANGLES);
 
+		positions.push(x);
+		positions.push(y);
+		positions.push(x + w);
+		positions.push(y);
+		positions.push(x);
+		positions.push(y + h);
+		positions.push(x + w);
+		positions.push(y);
+		positions.push(x);
+		positions.push(y + h);
+		positions.push(x + w);
+		positions.push(y + h);
+
+		if (pixelRect != null)
+		{
+			var uvx = pixelRect.x / currentTexture.width;
+			var uvy = pixelRect.y / currentTexture.height;
+			var uvw = pixelRect.width / currentTexture.width;
+			var uvh = pixelRect.height / currentTexture.height;
+
+			internalSetRectUVs(uvx, uvy, uvw, uvh);
+		}
+
+		add_color(col, 6);
+	}
+
+	function internalDrawTriangle(x1:Float, y1:Float, x2:Float, y2:Float, x3:Float, y3:Float, col:Color, pixelRect:IntRectangle): Void
+	{
 		positions.push(x1);
 		positions.push(y1);
 		positions.push(x2);
@@ -454,38 +585,165 @@ class GLRenderer
 		positions.push(x3);
 		positions.push(y3);
 
+		if (pixelRect != null)
+		{
+			var uvx = pixelRect.x / currentTexture.width;
+			var uvy = pixelRect.y / currentTexture.height;
+			var uvw = pixelRect.width / currentTexture.width;
+			var uvh = pixelRect.height / currentTexture.height;
+
+			uvs.push(uvx);
+			uvs.push(uvy);
+			uvs.push(uvx + uvw);
+			uvs.push(uvy);
+			uvs.push(uvx);
+			uvs.push(uvy + uvh);
+		}
+
 		add_color(col, 3);
+	}
+
+	public function drawTriangle(x1:Float, y1:Float, x2:Float, y2:Float, x3:Float, y3:Float, col:Color):Void
+	{
+		var pixelRect = getCurrentPixelRect();
+		if (pixelRect == null) setDrawMode(RenderingContext.TRIANGLES);
+
+		internalDrawTriangle(x1, y1, x2, y2, x3, y3, col, pixelRect);
 	}
 
 	public function drawTri(p1: Vector, p2: Vector, p3: Vector, col: Color): Void
 	{
-		setDrawMode(RenderingContext.TRIANGLES);
+		var pixelRect = getCurrentPixelRect();
+		if (pixelRect == null) setDrawMode(RenderingContext.TRIANGLES);
 
-		positions.push(p1.x);
-		positions.push(p1.y);
-		positions.push(p2.x);
-		positions.push(p2.y);
-		positions.push(p3.x);
-		positions.push(p3.y);
-
-		add_color(col, 3);
+		internalDrawTriangle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, col, pixelRect);
 	}
 
 	public function drawTris(points: Array<Vector>, offset: Vector, col: Color): Void
 	{
-		setDrawMode(RenderingContext.TRIANGLES);
+		var pixelRect = getCurrentPixelRect();
+		if (pixelRect == null) setDrawMode(RenderingContext.TRIANGLES);
 
 		var i = 0;
 		while (i < points.length - 2)
 		{
-			drawTriangle(
-				points[i].x + offset.x, points[i].y + offset.y,
-				points[i + 1].x + offset.x, points[i + 1].y + offset.y,
-				points[i + 2].x + offset.x, points[i + 2].y + offset.y,
-				col
+			internalDrawTriangle(
+				points[i].x + offset.x,
+				points[i].y + offset.y,
+				points[i + 1].x + offset.x,
+				points[i + 1].y + offset.y,
+				points[i + 2].x + offset.x,
+				points[i + 2].y + offset.y,
+				col,
+				pixelRect
 			);
 			i += 3;
 		}
+	}
+
+	function internalSetQuadsPosition(tl_x:Float, tl_y:Float, tr_x:Float, tr_y:Float, bl_x:Float, bl_y:Float, br_x:Float, br_y:Float): Void
+	{
+		positions.push(tl_x);
+		positions.push(tl_y);
+		positions.push(tr_x);
+		positions.push(tr_y);
+		positions.push(bl_x);
+		positions.push(bl_y);
+		positions.push(tr_x);
+		positions.push(tr_y);
+		positions.push(bl_x);
+		positions.push(bl_y);
+		positions.push(br_x);
+		positions.push(br_y);
+	}
+
+	/*function internalDrawQuads(tl_x:Float, tl_y:Float, tr_x:Float, tr_y:Float, bl_x:Float, bl_y:Float, br_x:Float, br_y:Float, col:Color, pixelRect:IntRectangle):Void
+	{
+		internalSetQuadsPosition(tl_x, tl_y, tr_x, tr_y, bl_x, bl_y, br_x, br_y);
+
+		if (pixelRect != null)
+		{
+			var uvx = pixelRect.x / currentTexture.width;
+			var uvy = pixelRect.y / currentTexture.height;
+			var uvw = pixelRect.width / currentTexture.width;
+			var uvh = pixelRect.height / currentTexture.height;
+
+			internalSetRectUVs(uvx, uvy, uvw, uvh);
+		}
+
+		add_color(col, 6);
+	}*/
+
+	static final lineThickness = 1.4;
+
+	/*function internalDrawLineQuads(a: Vector, b: Vector, col: Color, pixelRect: IntRectangle, zoom: Float): Void
+	{
+		var th_half = lineThickness / (zoom * 2);
+		var line = Vector.line(a, b);
+		var unit = new Vector(line.x, line.y).normalize();
+		var perp = new Vector(-unit.y * th_half, unit.x * th_half); // turned right
+
+		internalDrawQuads(a.x - perp.x, a.y - perp.y, b.x - perp.x, b.y - perp.y, a.x + perp.x, a.y + perp.y, b.x + perp.x, b.y + perp.y, col, pixelRect);
+	}*/
+
+	public function drawLineQuads(a: Vector, b: Vector, col: Color, ?zoom: Float): Void
+	{
+		if (zoom == null) zoom = 1;
+		else if (zoom == 0) return;
+
+		var pixelRect = getCurrentPixelRect();
+		if (pixelRect == null) setDrawMode(RenderingContext.TRIANGLES);
+
+		var th_half = lineThickness / (zoom * 2);
+		var line = Vector.line(a, b);
+		var unit = new Vector(line.x, line.y).normalize();
+		var perp = new Vector(-unit.y * th_half, unit.x * th_half); // turned right
+
+		internalSetQuadsPosition(a.x - perp.x, a.y - perp.y, b.x - perp.x, b.y - perp.y, a.x + perp.x, a.y + perp.y, b.x + perp.x, b.y + perp.y);
+
+		if (pixelRect != null)
+		{
+			var uvx = pixelRect.x / currentTexture.width;
+			var uvy = pixelRect.y / currentTexture.height;
+			var uvw = pixelRect.width / currentTexture.width;
+			var uvh = pixelRect.height / currentTexture.height;
+
+			internalSetRectUVs(uvx, uvy, uvw, uvh);
+		}
+
+		add_color(col, 6);
+	}
+
+	public function drawRectLineQuads(rect: Rectangle, col: Color, ?zoom: Float): Void
+	{
+		if (zoom == null) zoom = 1;
+		else if (zoom == 0) return;
+
+		var pixelRect = getCurrentPixelRect();
+		if (pixelRect == null) setDrawMode(RenderingContext.TRIANGLES);
+
+		var th_half = lineThickness / (zoom * 2);
+		var left = rect.x;
+		var top = rect.y;
+		var right = rect.x + rect.width;
+		var bottom = rect.y + rect.height;
+
+		internalSetQuadsPosition(left, top - th_half, right, top - th_half, left, top + th_half, right, top + th_half);
+		internalSetQuadsPosition(right + th_half, top, right + th_half, bottom, right - th_half, top, right - th_half, bottom);
+		internalSetQuadsPosition(right, bottom + th_half, left, bottom + th_half, right, bottom - th_half, left, bottom - th_half);
+		internalSetQuadsPosition(left - th_half, bottom, left - th_half, top, left + th_half, bottom, left + th_half, top);
+
+		if (pixelRect != null)
+		{
+			var uvx = pixelRect.x / currentTexture.width;
+			var uvy = pixelRect.y / currentTexture.height;
+			var uvw = pixelRect.width / currentTexture.width;
+			var uvh = pixelRect.height / currentTexture.height;
+
+			for (i in 0...4) internalSetRectUVs(uvx, uvy, uvw, uvh);
+		}
+
+		add_color(col, 24);
 	}
 
 	public function drawLine(a: Vector, b: Vector, col: Color): Void
@@ -562,7 +820,7 @@ class GLRenderer
 		}
 	}
 
-	public function drawGrid(gridSize: Vector, gridOffset: Vector, size: Vector, zoom: Float, col: Color): Void
+	public function drawGrid(gridSize: Vector, gridOffset: Vector, size: Vector, offset: Vector, zoom: Float, col: Color): Void
 	{
 		setDrawMode(RenderingContext.LINES);
 
@@ -575,31 +833,41 @@ class GLRenderer
 		while (intY * zoom < minSpace)
 			intY += gridSize.y;
 
-		var i = intX + gridOffset.x;
-		while (i < size.x)
+		var i = intX + gridOffset.x + offset.x;
+		var until = size.x + offset.x;
+		while (i < until)
 		{
 			positions.push(i);
-			positions.push(1 + gridOffset.y);
+			positions.push(1 + gridOffset.y + offset.y);
 			positions.push(i);
-			positions.push(size.y - 1 + gridOffset.y);
+			positions.push(size.y - 1 + gridOffset.y + offset.y);
 
 			add_color(col, 2);
 
 			i += intX;
 		}
 
-		i = intY + gridOffset.y;
-		while (i < size.y)
+		i = intY + gridOffset.y + offset.y;
+		until = size.y + offset.y;
+		while (i < until)
 		{
-			positions.push(1 + gridOffset.x);
+			positions.push(1 + gridOffset.x + offset.x);
 			positions.push(i);
-			positions.push(size.x - 1 + gridOffset.x);
+			positions.push(size.x - 1 + gridOffset.x + offset.x);
 			positions.push(i);
 
 			add_color(col, 2);
 
 			i += intY;
 		}
+	}
+
+	public function drawRectLines(x:Float, y:Float, w:Float, h:Float, col:Color)
+	{
+		drawLine(new Vector(x, y), new Vector(x + w, y), col);
+		drawLine(new Vector(x + w, y), new Vector(x + w, y + h), col);
+		drawLine(new Vector(x + w, y + h), new Vector(x, y + h), col);
+		drawLine(new Vector(x, y + h), new Vector(x, y), col);
 	}
 
 	public function drawLineRect(rect: Rectangle, col: Color): Void

@@ -19,7 +19,7 @@ class GridFloodTool extends GridTool
 
 		if (!layer.insideGrid(pos) || layer.data[pos.x.int()][pos.y.int()] == brush) return;
 
-		EDITOR.level.store("flood fill");
+		EDITOR.currentLevel.store("flood fill");
 		EDITOR.dirty();
 
 		var start = layer.data[pos.x.int()][pos.y.int()];
@@ -38,6 +38,8 @@ class GridFloodTool extends GridTool
 			if (cur.y < layer.gridCellsY - 1 && layer.data[cur.x.int()][cur.y.int() + 1] == start)
 				check.push(new Vector(cur.x, cur.y + 1));
 		}
+
+		layer.signalForAutotiler();
 	}
 
 	override public function getName():String return "Flood Fill";

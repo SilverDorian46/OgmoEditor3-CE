@@ -1,5 +1,6 @@
 package io;
 
+import level.editor.CelesteBackdropPreview;
 import electron.Shell;
 import util.Popup;
 import js.node.Fs;
@@ -13,30 +14,28 @@ class LevelManager
 
 	public function new () {}
 
-	public function create(?onSuccess:Level->Void):Void
+	public function create(?onSuccess:Level->Void, ?earlyCallback:Level->Void):Void
 	{
 		//Okay enforce the limit and create a new one
 		this.enforceLimit(function ()
 		{
-			var level = EDITOR.levelManager.forceCreate();
-			if (onSuccess != null)
-				onSuccess(level);
+			EDITOR.levelManager.forceCreate(onSuccess, earlyCallback);
 		});
 	}
 
-	public function loadLevel() {
+	public function loadLevel(onSuccess: Level -> Void) {
 		// If no level in cache...
-		forceCreate();
+		forceCreate(onSuccess);
 	}
 
-	public function forceCreate(): Level
+	public function forceCreate(onSuccess: Level -> Void, ?earlyCallback: Level -> Void): Void
 	{
 		var level = new Level(OGMO.project);
 		level.unsavedID = OGMO.project.getNextUnsavedLevelID();
+		if (earlyCallback != null) earlyCallback(level);
 		EDITOR.levelManager.levels.push(level);
 		EDITOR.levelsPanel.refresh();
-		EDITOR.setLevel(level);
-		return level;
+		EDITOR.setLevel(level, () -> { if (onSuccess != null) onSuccess(level); });
 	}
 
 	public function open(path:String, ?onSuccess:Level->Void, ?onError:String->Void):Void
@@ -45,15 +44,18 @@ class LevelManager
 
 		//Check if the level is already open
 		var level = this.get(path);
+
 		if (level != null)
 		{
 			this.moveToFront(level);
-			EDITOR.setLevel(level);
-			if (onSuccess != null)
-				onSuccess(level);
+			EDITOR.setLevel(level, () ->
+			{
+				if (onSuccess != null)
+					onSuccess(level);
 
-			if (level.externallyModified)
-				this.resolveModifiedLevel();
+				if (level.externallyModified)
+					this.resolveModifiedLevel(level);
+			});
 
 			return;
 		}
@@ -78,34 +80,31 @@ class LevelManager
 				return;
 			}
 
-			EDITOR.levelManager.levels.push(level);
-			EDITOR.setLevel(level);
-
-			if (onSuccess != null)
-				onSuccess(level);
+			this.levels.push(level);
+			EDITOR.setLevel(level, () -> { if (onSuccess != null) onSuccess(level); });
 		});
 	}
 
 	public function close(level:Level, ?onSuccess: Void->Void):Void
 	{
-		EDITOR.setLevel(level);
-		level.attemptClose(function ()
+		EDITOR.setLevel(level, () ->
 		{
-			EDITOR.levelManager.forceClose(level);
-			if (onSuccess != null)
-				onSuccess();
+			level.attemptClose(function ()
+			{
+				EDITOR.levelManager.forceClose(level, onSuccess);
+			});
 		});
 	}
 
-	public function forceClose(level: Level):Void
+	public function forceClose(level: Level, onSuccess: Void -> Void):Void
 	{
 		var n = EDITOR.levelManager.levels.indexOf(level);
-		EDITOR.levelManager.levels.splice(n, 1);
+		if (n >= 0) EDITOR.levelManager.levels.splice(n, 1);
 
-		if (EDITOR.level == level && EDITOR.levelManager.levels.length != 0)
-			EDITOR.setLevel(EDITOR.levelManager.levels[EDITOR.levelManager.levels.length - 1]);
+		if (EDITOR.currentLevel == level && EDITOR.levelManager.levels.length != 0)
+			EDITOR.setLevel(EDITOR.levelManager.levels[EDITOR.levelManager.levels.length - 1], onSuccess);
 		else
-			EDITOR.setLevel(null);
+			EDITOR.setLevel(null, onSuccess);
 	}
 
 	public function closeAll(?onSuccess: Void->Void):Void
@@ -124,11 +123,15 @@ class LevelManager
 		}
 
 		//Now close the rest
-		while (EDITOR.levelManager.levels.length > 0)
-			EDITOR.levelManager.forceClose(EDITOR.levelManager.levels[0]);
+		function recursiveClose()
+		{
+			if (EDITOR.levelManager.levels.length > 0)
+				EDITOR.levelManager.forceClose(EDITOR.levelManager.levels[0], recursiveClose);
+			else if (onSuccess != null)
+				onSuccess();
+		}
 
-		if (onSuccess != null)
-			onSuccess();
+		recursiveClose();
 	}
 
 	public function get(path:String): Level
@@ -169,7 +172,11 @@ class LevelManager
 	{
 		var level = this.get(path);
 		if (level != null)
-			this.forceClose(level);
+		{
+			EDITOR.onLevelDeleted(level);
+			this.forceClose(level, () -> Shell.moveItemToTrash(path));
+			return;
+		}
 
 		Shell.moveItemToTrash(path);
 	}
@@ -187,6 +194,9 @@ class LevelManager
 
 	function trim():Void
 	{
+		if (EDITOR.isEditingMap)
+			return;
+
 		/*
 			Levels are safe to close if they don't have unsaved changes
 			or anything on their undo/redo stacks
@@ -224,6 +234,12 @@ class LevelManager
 
 	function enforceLimit(onSuccess:Void->Void):Void
 	{
+		if (EDITOR.isEditingMap)
+		{
+			onSuccess();
+			return;
+		}
+
 		//First do a safe-to-close trim
 		EDITOR.levelManager.trim();
 
@@ -244,22 +260,29 @@ class LevelManager
 			onSuccess();
 	}
 
+	function updateOpenLevelsFromEditor(): Void
+	{
+		for (mapLevel in EDITOR.levelMap)
+			if (!levels.contains(mapLevel))
+				levels.push(mapLevel);
+	}
+
 	/*
 			FOCUS
 	*/
 
-	function resolveModifiedLevel():Void
+	function resolveModifiedLevel(level: Level):Void
 	{
-		Popup.open("Level File Modified", "warning", "<span class='monospace'>" + EDITOR.level.displayNameNoStar + "</span> was modified externally!", ["Reload", "Keep Mine"], function (i)
+		Popup.open("Level File Modified", "warning", "<span class='monospace'>" + level.displayNameNoStar + "</span> was modified externally!", ["Reload", "Keep Mine"], function (i)
 		{
 			if (i == 0)
 			{
-				Imports.levelInto(EDITOR.level.path, EDITOR.level);
-				EDITOR.level.unsavedChanges = false;
+				Imports.levelInto(level.path, level);
+				level.unsavedChanges = false;
 				EDITOR.dirty();
 			}
 			else
-				EDITOR.level.unsavedChanges = true;
+				level.unsavedChanges = true;
 
 			EDITOR.levelsPanel.refreshLabelsAndIcons();
 			OGMO.updateWindowTitle();
@@ -268,15 +291,30 @@ class LevelManager
 
 	public function onGainFocus():Void
 	{
-		if (EDITOR.level != null)
+		var level = EDITOR.currentLevel;
+		if (level != null)
 		{
-			if (EDITOR.level.externallyDeleted)
+			if (level.externallyDeleted)
 			{
-				EDITOR.level.deleted = true;
-				EDITOR.level.unsavedChanges = true;
+				level.deleted = true;
+				level.unsavedChanges = true;
 			}
-			else if (EDITOR.level.externallyModified)
-				this.resolveModifiedLevel();
+			else if (level.externallyModified)
+				this.resolveModifiedLevel(level);
+		}
+
+		if (EDITOR.backdropPreview != null)
+		{
+			if (EDITOR.backdropPreview.externallyDeleted)
+			{
+				EDITOR.backdropPreview = null;
+				EDITOR.dirty();
+			}
+			else if (EDITOR.backdropPreview.externallyModified)
+			{
+				EDITOR.backdropPreview = CelesteBackdropPreview.loadFromPath(EDITOR.backdropPreview.path);
+				EDITOR.dirty();
+			}
 		}
 	}
 
@@ -284,18 +322,32 @@ class LevelManager
 		FILE OPS
 	*/
 
-	public function onFolderDelete(dir:String):Void
+	public function onFolderDelete(dir:String, onSuccess:Void->Void):Void
 	{
+		var toClose: Array<Level> = [];
 		for (level in levels)
 			if (level.path != null && level.path.indexOf(dir) == 0)
-				this.forceClose(level);
+				toClose.push(level);
+
+		function recursiveClose()
+		{
+			if (toClose.length > 0)
+				this.forceClose(toClose.pop(), recursiveClose);
+			else if (onSuccess != null)
+				onSuccess();
+		}
+
+		recursiveClose();
 	}
 
-	public function onFolderRename(oldPath:String, newPath:String):Void
+	public function onFolderRename(oldPath:String, newPath:String, onSuccess:Void->Void):Void
 	{
 		for (level in levels)
 			if (level.path != null && level.path.indexOf(oldPath) == 0)
 				level.path = newPath + level.path.substr(oldPath.length);
+
+		if (EDITOR.mapDirectory == oldPath) EDITOR.loadLevelMap(newPath, onSuccess);
+		else if (onSuccess != null) onSuccess();
 	}
 
 	public function onLevelRename(oldPath:String, newPath:String):Void

@@ -1,5 +1,7 @@
 package modules.grid;
 
+import modules.tiles.TileLayer.TileData;
+import modules.autotiler.Autotiler;
 import level.data.Level;
 import level.data.Layer;
 
@@ -7,15 +9,20 @@ class GridLayer extends Layer
 {
 	public var data: Array<Array<String>>;
 
+	public var generated: Array<Array<GeneratedTileDef>>;
+	public var shouldUpdateGeneratedTiles: Bool;
+
 	public function new(level:Level, id:Int)
 	{
-			super(level, id);
-			initData();
+		super(level, id);
+		initData();
 	}
 
 	private function initData():Void
 	{
-		var empty = (cast template : GridLayerTemplate).transparent;
+		var gridTemplate = (cast template : GridLayerTemplate);
+
+		var empty = gridTemplate.transparent;
 		data = [];
 		for (x in 0...gridCellsX)
 		{
@@ -23,6 +30,14 @@ class GridLayer extends Layer
 			data.push(a);
 			for (y in 0...gridCellsY) a.push(empty);
 		}
+
+		generated = [];
+		shouldUpdateGeneratedTiles = true;
+	}
+
+	public function signalForAutotiler(): Void
+	{
+		shouldUpdateGeneratedTiles = true;
 	}
 
 	override function save():Dynamic
@@ -72,6 +87,8 @@ class GridLayer extends Layer
 		}
 		else throw "Invalid Tile Layer Array Mode: " + arrayMode;
 		// this.data = flip2dArray(this.data);
+
+		signalForAutotiler();
 	}
 
 	public function subtractRow(end:Bool):Void
@@ -84,6 +101,8 @@ class GridLayer extends Layer
 		{
 			for (i in 0...data.length) data[i].splice(0, 1);
 		}
+
+		signalForAutotiler();
 	}
 
 	public function addRow(end:Bool):Void
@@ -98,12 +117,16 @@ class GridLayer extends Layer
 		{
 			for (i in 0...data.length) data[i].insert(0, empty);
 		}
+
+		signalForAutotiler();
 	}
 
 	public function subtractColumn(end:Bool):Void
 	{
 		if (end) data.pop();
 		else data.splice(0, 1);
+
+		signalForAutotiler();
 	}
 
 	public function addColumn(end:Bool):Void
@@ -114,14 +137,27 @@ class GridLayer extends Layer
 
 		if (end) data.push(a);
 		else data.insert(0, a);
+
+		signalForAutotiler();
 	}
 
 	override function clone(): GridLayer
 	{
-			var g = new GridLayer(level, id);
-			g.offset = offset.clone();
-			g.data = Calc.cloneArray2D(data);
-			return g;
+		var g = new GridLayer(level, id);
+		g.offset = offset.clone();
+		g.data = Calc.cloneArray2D(data);
+
+		// why is generated undefined here???
+		/*for (x in 0...generated.length)
+		{
+			var cloneGenX: Array<GeneratedTileDef> = [];
+			var genX = generated[x];
+			for (gen in genX) cloneGenX.push(new GeneratedTileDef(gen.tileset, gen.data.idx));
+			g.generated.push(cloneGenX);
+		}
+		g.shouldUpdateGeneratedTiles = false;*/
+
+		return g;
 	}
 
 	override function resize(newSize:Vector, shiftBy:Vector):Void
@@ -188,6 +224,8 @@ class GridLayer extends Layer
 				y++;
 			}
 		}
+
+		signalForAutotiler();
 	}
 
 	override function shift(shift:Vector):Void
@@ -240,6 +278,8 @@ class GridLayer extends Layer
 			}
 			data = nData;
 		}
+
+		signalForAutotiler();
 	}
 
 	public function checkRect(x:Int, y:Int, w:Int, h:Int, value:String):Bool

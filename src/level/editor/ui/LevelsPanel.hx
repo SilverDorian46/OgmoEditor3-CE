@@ -207,7 +207,8 @@ class LevelsPanel extends SidePanel
 					item.setKylesetIcon("radio-on");
 
 					//Selected?
-					if (EDITOR.level != null) item.selected = (EDITOR.level.managerPath == path);
+					var currentLevel = EDITOR.currentLevel;
+					if (currentLevel != null) item.selected = (currentLevel.managerPath == path);
 
 					//Events
 					item.onclick = selectLevel;
@@ -277,6 +278,9 @@ class LevelsPanel extends SidePanel
 				}
 				else recursiveFolderExpandCheck(itemlist);
 
+				// TO-DO: figure out why this doesn't work consistently
+				for (child in itemlist.children) child.sort(true);
+
 				//Sort folders to the top
 				itemlist.foldersToTop(true);
 
@@ -297,7 +301,8 @@ class LevelsPanel extends SidePanel
 				var lev = EDITOR.levelManager.get(node.data);
 				if (lev != null)
 				{
-					node.selected = (EDITOR.level != null && EDITOR.level.managerPath == node.data);
+					var currentLevel = EDITOR.currentLevel;
+					node.selected = (currentLevel != null && currentLevel.managerPath == node.data);
 					if (lev.deleted) node.setKylesetIcon("level-broken");
 					else node.setKylesetIcon("level-on");
 				}
@@ -440,6 +445,39 @@ class LevelsPanel extends SidePanel
 		var menu = new RightClickMenu(OGMO.mouse);
 		menu.onClosed(function() { node.highlighted = false; });
 
+		if (EDITOR.mapDirectory == node.data)
+		{
+			menu.addOption("Close Level Map", "no", function()
+			{
+				EDITOR.closeLevelMap(null);
+			});
+		}
+		else
+		{
+			var containsLevels: Bool = false;
+			for (child in node.children)
+			{
+				var level = EDITOR.levelManager.get(child.data);
+				if (level == null)
+				{
+					try { level = Imports.level(child.data); }
+					catch (_) {}
+				}
+				if (level != null)
+				{
+					containsLevels = true;
+					break;
+				}
+			}
+			if (containsLevels)
+			{
+				menu.addOption("Open Level Map", "book", function()
+				{
+					EDITOR.loadLevelMap(node.data, null);
+				});
+			}
+		}
+
 		menu.addOption("Create Level Here", "new-file", function()
 		{
 			//Get the default name
@@ -455,7 +493,7 @@ class LevelsPanel extends SidePanel
 			while (FileSystem.exists(path));
 
 			//Ask the user for a name
-			Popup.openText("Create Level", "new-file", name, "Create", "Cancel", function (str)
+			Popup.openTextVector("Create Level", "new-file", name, (EDITOR.currentLevel != null ? EDITOR.currentLevel.data.offset : new Vector()), "Create", "Cancel", function (str, vec)
 			{
 				if (str != null && str != "")
 				{
@@ -468,8 +506,13 @@ class LevelsPanel extends SidePanel
 					{
 						EDITOR.levelManager.create(function (level)
 						{
-							level.path = path;
+							//level.path = path;
+							//level.data.offset = vec;
 							level.doSave();
+						}, (level) ->
+						{
+							level.path = path;
+							level.data.offset = vec;
 						});
 					}
 				}
@@ -504,9 +547,11 @@ class LevelsPanel extends SidePanel
 					else
 					{
 						Fs.renameSync(oldPath, newPath);
-						EDITOR.levelManager.onFolderRename(oldPath, newPath);
-						OGMO.project.renameAbsoluteLevelPathAndSave(oldPath, newPath);
-						EDITOR.levelsPanel.refresh();
+						EDITOR.levelManager.onFolderRename(oldPath, newPath, () ->
+						{
+							OGMO.project.renameAbsoluteLevelPathAndSave(oldPath, newPath);
+							EDITOR.levelsPanel.refresh();
+						});
 					}
 				}
 			});
@@ -522,9 +567,12 @@ class LevelsPanel extends SidePanel
 					{
 						FileSystem.removeFolder(node.data);
 
-						EDITOR.levelManager.onFolderDelete(node.data);
-						OGMO.project.removeAbsoluteLevelPathAndSave(node.data);
-						EDITOR.levelsPanel.refresh();
+						EDITOR.levelManager.onFolderDelete(node.data, () ->
+						{
+							OGMO.project.removeAbsoluteLevelPathAndSave(node.data);
+							EDITOR.levelsPanel.refresh();
+						});
+						
 					}
 				});
 			});
@@ -549,8 +597,7 @@ class LevelsPanel extends SidePanel
 
 		menu.addOption("Create Level", "new-file", function()
 		{
-			EDITOR.levelManager.create();
-			EDITOR.levelsPanel.refresh();
+			EDITOR.levelManager.create((level) -> EDITOR.levelsPanel.refresh());
 		});
 
 		node.highlighted = true;
@@ -606,11 +653,21 @@ class LevelsPanel extends SidePanel
 
 		if (EDITOR.levelManager.isOpen(node.data))
 		{
-			menu.addOption("Close", "no", function()
+			if (EDITOR.isEditingMap)
 			{
-				var level = EDITOR.levelManager.get(node.data);
-				if (level != null) EDITOR.levelManager.close(level);
-			});
+				menu.addOption("Open As Single Level", "book", function()
+				{
+					EDITOR.closeLevelMap(() -> selectLevel(node));
+				});
+			}
+			else
+			{
+				menu.addOption("Close", "no", function()
+				{
+					var level = EDITOR.levelManager.get(node.data);
+					if (level != null) EDITOR.levelManager.close(level);
+				});
+			}
 		}
 
 		menu.addOption("Rename", "pencil", function()
@@ -671,7 +728,8 @@ class LevelsPanel extends SidePanel
 			}, 0, endSel);
 		});
 
-		menu.addOption("Duplicate", "new-file", function()
+		// To-do
+		if (EDITOR.mapDirectory != Path.dirname(node.data)) menu.addOption("Duplicate", "new-file", function()
 		{
 			var ext:String = Path.extname(node.data);
 			var base:String = Path.basename(node.data, ext);
@@ -728,6 +786,29 @@ class LevelsPanel extends SidePanel
 			{
 				EDITOR.saveLevelAsImage();
 			});
+		}
+
+		if (EDITOR.backdropPreview != null && EDITOR.backdropPreview.path == node.data)
+		{
+			menu.addOption("Stop Previewing Style", "eye-closed", function()
+			{
+				EDITOR.backdropPreview = null;
+				EDITOR.dirty();
+			});
+		}
+		else
+		{
+			var json: Dynamic;
+			try { json = FileSystem.loadJSON(node.data); }
+			catch (_) { json = null; }
+			if (json != null && json.Style != null)
+			{
+				menu.addOption("Preview Celeste Style", "eye-open", function()
+				{
+					EDITOR.backdropPreview = CelesteBackdropPreview.loadFromPath(node.data);
+					EDITOR.dirty();
+				});
+			}
 		}
 
 		node.highlighted = true;

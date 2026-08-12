@@ -1,5 +1,7 @@
 package rendering;
 
+import util.IntRectangle;
+import haxe.io.Path;
 import js.html.webgl.RenderingContext;
 import js.Browser;
 import js.html.ImageElement;
@@ -20,6 +22,8 @@ class Texture
 	public var width(get, null):Int;
 	public var height(get, null):Int;
 
+	public var pixelRect: IntRectangle;
+
 	public static function fromString(data: String): Texture
 	{
 		var image = Browser.document.createImageElement();
@@ -39,16 +43,36 @@ class Texture
 		}
 		return null;
 	}
+
+	public static function fromRelativePath(path: String, relativeTo: String): Texture
+	{
+		if (relativeTo == null) relativeTo = js.node.Path.dirname(OGMO.project.path);
+		var fullPath = js.node.Path.join(relativeTo, path);
+		for (ext in FileSystem.supportedImageExts)
+		{
+			var texture = fromFile(fullPath + ext);
+			if (texture != null) return texture;
+		}
+		return null;
+	}
+
+	public static function loadFromData(data: String, onLoad: (Texture) -> Void): Void
+	{
+		var image = Browser.document.createImageElement();
+		image.src = data;
+		if (image.width <= 0) image.onload = function() { onLoad(new Texture(image)); }
+		else onLoad(new Texture(image));
+	}
 	
-	public function new(image: ImageElement)
+	public function new(image: ImageElement, ?onLoaded: Texture -> Void)
 	{
 		this.image = image;
 		
-		if (image.width <= 0) image.onload = function() { load(); };
-		else load();
+		if (image.width <= 0) image.onload = function() { load(onLoaded); };
+		else load(onLoaded);
 	}
 
-	function load():Void
+	function load(onLoaded: Texture -> Void):Void
 	{
 		center = new Vector(image.width / 2, image.height / 2);
 		for (name in GLRenderer.renderers.keys())
@@ -69,12 +93,15 @@ class Texture
 				textures[name] = tex;
 			}
 		}
+
+		if (onLoaded != null) onLoaded(this);
 	}
 	
 	public inline function dispose(): Void
 	{
 		for (name in textures.keys()) GLRenderer.renderers[name].gl.deleteTexture(textures[name]);
 		textures = new Map();
+		pixelRect = null;
 	}
 	
 	inline function get_width(): Int return image.width;

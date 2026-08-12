@@ -1,5 +1,6 @@
 package modules.decals.tools;
 
+import level.data.Level;
 import modules.entities.tools.EntitySelectTool.SelectModes;
 
 class DecalSelectTool extends DecalTool
@@ -13,12 +14,13 @@ class DecalSelectTool extends DecalTool
 	public var end:Vector = new Vector();
 	public var firstChange:Bool = false;
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
+		var offset = level.data.offset;
 		if (mode == Select && !start.equals(end))
-			EDITOR.overlay.drawRect(start.x, start.y, end.x - start.x, end.y - start.y, Color.green.x(0.2));
+			EDITOR.overlay.drawRect(start.x + offset.x, start.y + offset.y, end.x - start.x, end.y - start.y, Color.green.x(0.4));
 		else if (mode == Delete && !start.equals(end))
-			EDITOR.overlay.drawRect(start.x, start.y, end.x - start.x, end.y - start.y, Color.red.x(0.2));
+			EDITOR.overlay.drawRect(start.x + offset.x, start.y + offset.y, end.x - start.x, end.y - start.y, Color.red.x(0.4));
 	}
 
 	override public function deactivated()
@@ -33,7 +35,7 @@ class DecalSelectTool extends DecalTool
 			if (key == Keys.A)
 			{
 				layerEditor.selected = [];
-				for (decal in (cast layerEditor.layer:DecalLayer).decals)
+				for (decal in (cast layerEditor.getLayerFromCurrentLevel():DecalLayer).decals)
 					layerEditor.selected.push(decal);
 				layerEditor.selectedChanged = true;
 				EDITOR.dirty();
@@ -50,21 +52,21 @@ class DecalSelectTool extends DecalTool
 				for (decal in layerEditor.selected)
 					DecalSelectTool.inClipboard.push(decal);
 
-				EDITOR.level.store("cut decals");
+				EDITOR.currentLevel.store("cut decals");
 				while (layerEditor.selected.length > 0)
-					layerEditor.remove(layerEditor.selected[0]);
+					layerEditor.remove(layer, layerEditor.selected[0]);
 				layerEditor.selectedChanged = true;
 				EDITOR.dirty();
 			}
 			else if (key == Keys.V && DecalSelectTool.inClipboard.length > 0)
 			{
-				EDITOR.level.store("pasted decals");
+				EDITOR.currentLevel.store("pasted decals");
 
 				layerEditor.selected = [];
 				for (decal in DecalSelectTool.inClipboard)
 				{
-					var clone = new Decal(decal.position.clone(), decal.path, decal.texture, decal.origin.clone(), decal.scale.clone(), decal.rotation);
-					(cast layerEditor.layer:DecalLayer).decals.push(clone);
+					var clone = new Decal(decal.position.clone(), decal.path, decal.texture, decal.origin.clone(), decal.scale.clone(), decal.rotation, decal.color.clone());
+					(cast layerEditor.getLayerFromCurrentLevel():DecalLayer).decals.push(clone);
 					layerEditor.selected.push(clone);
 				}
 
@@ -73,13 +75,13 @@ class DecalSelectTool extends DecalTool
 			}
 			else if (key == Keys.D && layerEditor.selected.length > 0)
 			{
-				EDITOR.level.store("duplicated decals");
+				EDITOR.currentLevel.store("duplicated decals");
 
 				var newSelection:Array<Decal> = [];
 				for (decal in layerEditor.selected)
 				{
-					var clone = new Decal(decal.position.clone().add(new Vector(32, 32)), decal.path, decal.texture, decal.origin.clone(), decal.scale.clone(), decal.rotation);
-					(cast layerEditor.layer:DecalLayer).decals.push(clone);
+					var clone = new Decal(decal.position.clone().add(new Vector(32, 32)), decal.path, decal.texture, decal.origin.clone(), decal.scale.clone(), decal.rotation, decal.color.clone());
+					(cast layerEditor.getLayerFromCurrentLevel():DecalLayer).decals.push(clone);
 					newSelection.push(clone);
 				}
 
@@ -92,7 +94,7 @@ class DecalSelectTool extends DecalTool
 		{
 			if ((cast layerEditor.template : DecalLayerTemplate).scaleable)
 			{
-				EDITOR.level.store("flip decal h");
+				EDITOR.currentLevel.store("flip decal h");
 				for (decal in layerEditor.selected)
 					decal.scale.x = -decal.scale.x;
 				layerEditor.selectedChanged = true;
@@ -103,7 +105,7 @@ class DecalSelectTool extends DecalTool
 		{
 			if ((cast layerEditor.template : DecalLayerTemplate).scaleable)
 			{
-				EDITOR.level.store("flip decal v");
+				EDITOR.currentLevel.store("flip decal v");
 				for (decal in layerEditor.selected)
 					decal.scale.y = -decal.scale.y;
 				layerEditor.selectedChanged = true;
@@ -112,21 +114,21 @@ class DecalSelectTool extends DecalTool
 		}
 		else if (key == Keys.Delete || key == Keys.Backspace)
 		{
-			EDITOR.level.store("delete decals");
+			EDITOR.currentLevel.store("delete decals");
 			while (layerEditor.selected.length > 0)
-				layerEditor.remove(layerEditor.selected[0]);
+				layerEditor.remove(layer, layerEditor.selected[0]);
 			layerEditor.selectedChanged = true;
 			EDITOR.dirty();
 		}
 		else if (key == Keys.B)
 		{
-			EDITOR.level.store("move decal back");
+			EDITOR.currentLevel.store("move decal back");
 			for (decal in layerEditor.selected) OGMO.shift ? moveDecalToBack(decal) : moveDecalBack(decal);
 			EDITOR.dirty();
 		}
 		else if (key == Keys.F)
 		{
-			EDITOR.level.store("move decal forward");
+			EDITOR.currentLevel.store("move decal forward");
 			for (decal in layerEditor.selected) OGMO.shift ? moveDecalToFront(decal) : moveDecalForward(decal);
 			EDITOR.dirty();
 		}
@@ -207,7 +209,8 @@ class DecalSelectTool extends DecalTool
 	{
 		mode = Move;
 		firstChange = false;
-		layer.snapToGrid(start, start);
+		if (!OGMO.ctrl) layer.snapToGrid(start, start);
+		else layer.snapToPixel(start, start);
 		decals = layerEditor.selected;
 	}
 
@@ -257,13 +260,14 @@ class DecalSelectTool extends DecalTool
 		{
 			if (!OGMO.ctrl)
 				layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 
 			if (!pos.equals(start))
 			{
 				if (!firstChange)
 				{
 					firstChange = true;
-					EDITOR.level.store("move decals");
+					EDITOR.currentLevel.store("move decals");
 				}
 
 				var diff = new Vector(pos.x - start.x, pos.y - start.y);
@@ -320,12 +324,13 @@ class DecalSelectTool extends DecalTool
 
 			if (hit.length > 0)
 			{
-				EDITOR.level.store("delete decals");
+				EDITOR.currentLevel.store("delete decals");
+				var layer = this.layer;
 				if (click)
-					layerEditor.remove(hit[0]);
+					layerEditor.remove(layer, hit[0]);
 				else
 					for (decal in hit)
-						layerEditor.remove(decal);
+						layerEditor.remove(layer, decal);
 			}
 
 			mode = None;

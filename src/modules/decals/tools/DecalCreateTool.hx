@@ -1,5 +1,6 @@
 package modules.decals.tools;
 
+import level.data.Level;
 import level.data.Value;
 
 class DecalCreateTool extends DecalTool
@@ -14,11 +15,13 @@ class DecalCreateTool extends DecalTool
 	public var firstDelete:Bool = false;
 	public var lastDeletePos:Vector = new Vector();
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (layerEditor.brush != null && created == null && !deleting && canPreview)
 		{
-			EDITOR.overlay.drawTexture(previewAt.x, previewAt.y, layerEditor.brush, layerEditor.brush.center, scale);
+			var offset = level.data.offset;
+			//EDITOR.overlay.drawTexture(previewAt.x, previewAt.y, layerEditor.brush, layerEditor.brush.center, scale);
+			EDITOR.overlay.drawSubtexture(previewAt.x + offset.x, previewAt.y + offset.y, layerEditor.brush.texture, layerEditor.brush.texture.center, scale);
 		}
 	}
 
@@ -39,14 +42,15 @@ class DecalCreateTool extends DecalTool
 
 		if (layerEditor.brush == null) return;
 		if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+		else layer.snapToPixel(pos, pos);
 
-		EDITOR.level.store("create decal");
+		EDITOR.currentLevel.store("create decal");
 		EDITOR.locked = true;
 		EDITOR.dirty();
 
-		var path = js.node.Path.relative((cast layerEditor.template:DecalLayerTemplate).folder, layerEditor.brush.path);
+		var path = FileSystem.normalize(js.node.Path.relative((cast layerEditor.template:DecalLayerTemplate).folder, layerEditor.brush.path));
 		var values = [for (template in (cast layerEditor.template:DecalLayerTemplate).values) new Value(template)];
-		created = new Decal(pos, path, layerEditor.brush, origin, scale, 0, values);
+		created = new Decal(pos, path, layerEditor.brush.texture, origin, scale, 0, Color.white, values);
 		layer.decals.push(created);
 
 		if (OGMO.keyCheckMap[Keys.Shift])
@@ -87,6 +91,7 @@ class DecalCreateTool extends DecalTool
 
 	public function doDelete(pos:Vector)
 	{
+		var layer = this.layer;
 		var hit = layer.getAt(pos);
 
 		if (hit.length > 0)
@@ -94,10 +99,10 @@ class DecalCreateTool extends DecalTool
 			if (!firstDelete)
 			{
 				firstDelete = true;
-				EDITOR.level.store("delete decals");
+				EDITOR.currentLevel.store("delete decals");
 			}
 
-			layerEditor.remove(hit[hit.length - 1]);
+			layerEditor.remove(layer, hit[hit.length - 1]);
 			EDITOR.dirty();
 		}
 	}
@@ -108,6 +113,7 @@ class DecalCreateTool extends DecalTool
 		{
 			if (!OGMO.ctrl)
 				layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 
 			if (!pos.equals(created.position))
 			{
@@ -127,6 +133,7 @@ class DecalCreateTool extends DecalTool
 		{
 			if (!OGMO.ctrl)
 				layer.snapToGrid(pos, pos);
+			else layer.snapToPixel(pos, pos);
 
 			canPreview = true;
 			previewAt = pos;
@@ -153,15 +160,15 @@ class DecalCreateTool extends DecalTool
 			}
 		}
 		// TODO - Prep for UX overhaul PR!
-		/*else if (key == Keys.B)
+		else if (key == Keys.B)
 		{
-			EDITOR.level.store("move decal to back");
+			EDITOR.currentLevel.store("move decal to back");
 			for (decal in layerEditor.selected) moveDecalToBack(decal);
 			EDITOR.dirty();
 		}
 		else if (key == Keys.F)
 		{
-			EDITOR.level.store("move decal to front");
+			EDITOR.currentLevel.store("move decal to front");
 			for (decal in layerEditor.selected) moveDecalToFront(decal);
 			EDITOR.dirty();
 		}
@@ -180,7 +187,7 @@ class DecalCreateTool extends DecalTool
 		var index = layer.decals.indexOf(decal);
 		if (index < 0) return;
 		layer.decals.splice(index, 1);
-		layer.decals.push(decal);*/
+		layer.decals.push(decal);
 	}
 
 	override public function getIcon():String return "entity-create";

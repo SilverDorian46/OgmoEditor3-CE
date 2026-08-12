@@ -31,6 +31,9 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 	public var entityName:JQuery;
 	public var entityLimit:JQuery;
 	public var entityColor:JQuery;
+	public var entityColorable:JQuery;
+	public var entityColorAlpha:JQuery;
+	public var entityColorHashtag:JQuery;
 	public var entityTags:JQuery;
 	public var entitySize:JQuery;
 	public var entityOrigin:JQuery;
@@ -46,8 +49,11 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 	public var entityRotationDegrees:JQuery;
 	public var entityHasNodes:JQuery;
 	public var entityNodeDisplay:JQuery;
+	public var entityNodeMinimum:JQuery;
 	public var entityNodeLimit:JQuery;
 	public var entityNodeGhost:JQuery;
+	public var entityNodePoint:JQuery;
+	//public var entityNodePointSize:JQuery;
 
 	// Entity Value Template Mananger
 	public var entityValueManager:ValueTemplateManager;
@@ -93,9 +99,9 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 
 	public function newEntity(?addTag:String)
 	{
-		Popup.openText("Create New Entity", "plus", "new entity", "Create", "Cancel", function(name)
+		Popup.openText("Create New Entity", "plus", "new_entity", "Create", "Cancel", function(name)
 		{
-			if (name.length > 0 && name != null)
+			if (name != null && name.length > 0)
 			{
 				var entity = EntityTemplate.create(OGMO.project);
 				entity.name = name;
@@ -507,7 +513,8 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 
 				if (entity.texture != null)
 				{
-					var img = new JQuery('<img src="${entity.texture.image.src}"/>');
+					//var img = new JQuery('<img src="${entity.texture.image.src}"/>');
+					var img = new JQuery('<img src="${entity.texture.extractImageDataURL()}"/>');
 					texturePreview.append(img);
 				}
 
@@ -519,19 +526,20 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 						entity.setTexture(path, OGMO.project);
 
 						texturePreview.empty();
-						var img = new JQuery('<img src="${entity.texture.image.src}"/>');
+						//var img = new JQuery('<img src="${entity.texture.image.src}"/>');
+						var img = new JQuery('<img src="${entity.texture.extractImageDataURL()}"/>');
 						texturePreview.append(img);
 						refreshList();
 					}
 				 }), SettingsBlock.Fourth);
 
-				var iconleft = new JQuery('<div style="float: left; box-sizing: border-box; padding: 16px;">');
-				var iconright = new JQuery('<div style="width: 50%; float: left;">');
+				var iconleft = new JQuery('<div style="float: left; box-sizing: border-box; padding: 16px; width: 33.33%;">');
+				var iconright = new JQuery('<div style="width: 33.33%; float: left;">');
 				inspector.append(iconleft);
 				inspector.append(iconright);
 
 				// entity Color
-				entityColor = Fields.createColor("Entity Icon Color", entity.color, null, function(c)
+				entityColor = Fields.createColor("Entity Icon Color", entity.color, true, true, null, function(c)
 				{
 					entity.color = c;
 					entity.onShapeChanged();
@@ -542,7 +550,16 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 							n.setImageIcon(entity.getIcon());
 					});
 				});
-				Fields.createSettingsBlock(iconleft, entityColor, SettingsBlock.Half);
+				Fields.createSettingsBlock(iconleft, entityColor, SettingsBlock.Fourth);
+
+				entityColorable = Fields.createCheckbox(entity.canSetColor, "Colorable");
+				Fields.createSettingsBlock(iconleft, entityColorable, SettingsBlock.ThreeForths);
+
+				entityColorAlpha = Fields.createCheckbox(entity.includeAlpha, "Include Alpha");
+				Fields.createSettingsBlock(iconleft, entityColorAlpha, SettingsBlock.Half);
+
+				entityColorHashtag = Fields.createCheckbox(entity.includeHashtag, "Include #");
+				Fields.createSettingsBlock(iconleft, entityColorHashtag, SettingsBlock.Half);
 
 				// tile-size
 				entityTileSize = Fields.createVector(entity.tileSize);
@@ -575,6 +592,10 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 				entityNodeGhost = Fields.createCheckbox(entity.nodeGhost, "Draw Ghosts");
 				Fields.createSettingsBlock(inspector, entityNodeGhost, SettingsBlock.Fourth);
 
+				// minimum
+				entityNodeMinimum = Fields.createField("Minimum #", (entity.nodeMinimum > 0 ? entity.nodeMinimum.string() : ""));
+				Fields.createSettingsBlock(inspector, entityNodeMinimum, SettingsBlock.Fourth);
+
 				// limit
 				entityNodeLimit = Fields.createField("Limit #", (entity.nodeLimit > 0 ? entity.nodeLimit.string() : ""));
 				Fields.createSettingsBlock(inspector, entityNodeLimit, SettingsBlock.Fourth);
@@ -590,6 +611,14 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 				entityNodeDisplay = Fields.createOptions(nodeDisplays);
 				entityNodeDisplay.val(entity.nodeDisplay.string());
 				Fields.createSettingsBlock(inspector, entityNodeDisplay, SettingsBlock.Fourth);
+
+				// whether to render nodes as rectangular points
+				entityNodePoint = Fields.createCheckbox(entity.nodePoint, "Draw Points");
+				Fields.createSettingsBlock(inspector, entityNodePoint, SettingsBlock.Fourth);
+
+				// size of the node points
+				//entityNodePointSize = Fields.createVector(entity.nodePointSize);
+				//Fields.createSettingsBlock(inspector, entityNodePointSize, SettingsBlock.Third, "Point Size", SettingsBlock.InlineTitle);
 			}
 
 			// custom variables
@@ -621,6 +650,9 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 
 		// icon stuff
 		entity.color = Fields.getColor(entityColor);
+		entity.canSetColor = Fields.getCheckbox(entityColorable);
+		entity.includeAlpha = Fields.getCheckbox(entityColorAlpha);
+		entity.includeHashtag = Fields.getCheckbox(entityColorHashtag);
 		entity.tileX = Fields.getCheckbox(entityTileX);
 		entity.tileY = Fields.getCheckbox(entityTileY);
 		entity.tileSize = Fields.getVector(entityTileSize);
@@ -628,8 +660,11 @@ class ProjectEntitiesPanel extends ProjectEditorPanel
 		// nodes
 		entity.hasNodes = Fields.getCheckbox(entityHasNodes);
 		entity.nodeGhost = Fields.getCheckbox(entityNodeGhost);
+		entity.nodeMinimum = Imports.integer(Fields.getField(entityNodeMinimum), 0);
 		entity.nodeLimit = Imports.integer(Fields.getField(entityNodeLimit), 0);
 		entity.nodeDisplay = Imports.integer(entityNodeDisplay.val(), 0);
+		entity.nodePoint = Fields.getCheckbox(entityNodePoint);
+		//entity.nodePointSize = Fields.getVector(entityNodePointSize);
 
 		// overwrite values with value editor values
 		entityValueManager.save();

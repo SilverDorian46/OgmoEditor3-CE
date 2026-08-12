@@ -8,7 +8,8 @@ import util.Fields;
 class IntegerValueTemplateEditor extends ValueTemplateEditor
 {
 	public var defaultField:JQuery;
-	public var boundedField:JQuery;
+	public var boundedMinField:JQuery;
+	public var boundedMaxField:JQuery;
 	public var minField:JQuery;
 	public var maxField:JQuery;
 
@@ -23,13 +24,16 @@ class IntegerValueTemplateEditor extends ValueTemplateEditor
 		// min / max / bounded
 
 		minField = Fields.createField("Min", intTemplate.min.string());
-		Fields.createSettingsBlock(into, minField, SettingsBlock.Half75, "Min", SettingsBlock.InlineTitle);
+		Fields.createSettingsBlock(into, minField, SettingsBlock.Fourth, "Min", SettingsBlock.InlineTitle);
+
+		boundedMinField = Fields.createCheckbox(intTemplate.boundedMin, "Clamp Min");
+		Fields.createSettingsBlock(into, boundedMinField, SettingsBlock.Fourth);
 
 		maxField = Fields.createField("Max", intTemplate.max.string());
-		Fields.createSettingsBlock(into, maxField, SettingsBlock.Half75, "Max", SettingsBlock.InlineTitle);
+		Fields.createSettingsBlock(into, maxField, SettingsBlock.Fourth, "Max", SettingsBlock.InlineTitle);
 
-		boundedField = Fields.createCheckbox(intTemplate.bounded, "Clamp");
-		Fields.createSettingsBlock(into, boundedField, SettingsBlock.Fourth);
+		boundedMaxField = Fields.createCheckbox(intTemplate.boundedMax, "Clamp Max");
+		Fields.createSettingsBlock(into, boundedMaxField, SettingsBlock.Fourth);
 	}
 
 	override function save()
@@ -37,7 +41,8 @@ class IntegerValueTemplateEditor extends ValueTemplateEditor
 		var intTemplate:IntegerValueTemplate = cast template;
 
 		intTemplate.defaults = Imports.integer(Fields.getField(defaultField), 0);
-		intTemplate.bounded = Fields.getCheckbox(boundedField);
+		intTemplate.boundedMin = Fields.getCheckbox(boundedMinField);
+		intTemplate.boundedMax = Fields.getCheckbox(boundedMaxField);
 		intTemplate.min = Imports.integer(Fields.getField(minField), 0);
 		intTemplate.max = Imports.integer(Fields.getField(maxField), 100);
 	}

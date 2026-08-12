@@ -45,10 +45,18 @@ class ProjectLayersPanel extends ProjectEditorPanel
 
 	override public function begin(reset:Bool = false):Void
 	{
-		// new layer stuff
 		buttons.empty();
+
+		// new layer stuff
 		var newLayerButton = Fields.createButton("plus", 'New Layer', buttons);
 		newLayerButton.on("click", function() { newLayer(); });
+
+		// import/export layers
+		var importLayersButton = Fields.createButton("new-file", "Import Layers", buttons);
+		importLayersButton.on("click", function() { importLayers(); });
+
+		var exportLayersButton = Fields.createButton("save", "Export Layers", buttons);
+		exportLayersButton.on("click", function() { exportLayers(); });
 
 		if (reset) inspecting = null;
 
@@ -163,5 +171,55 @@ class ProjectLayersPanel extends ProjectEditorPanel
 	override public function end():Void
 	{
 		save(layerTemplateEditor);
+	}
+
+	public function importLayers()
+	{
+		var addedCount = 0;
+		var notAddedCount = 0;
+		var path = FileSystem.chooseFile("Select Ogmo Project or Exported Layer Templates", [{ name: "Ogmo Project or Exported Layer Templates", extensions: ["ogmo", "json"] }]);
+
+		if (FileSystem.exists(path))
+		{
+			var data: Dynamic = FileSystem.loadJSON(path);
+			if (data == null || data.layers == null) return;
+
+			for (layer in (cast data.layers : Array<Dynamic>))
+			{
+				if (OGMO.project.layers.filter(l -> l.exportID == layer.exportID).length == 0)
+				{
+					var definitionId = layer.definition;
+					var definition = LayerDefinition.getDefinitionById(definitionId);
+					var exportID:String = layer.exportID;
+
+					var template = definition.loadTemplate(exportID, layer);
+					template.projectWasLoaded(OGMO.project);
+					OGMO.project.layers.push(template);
+
+					addedCount++;
+				}
+				else notAddedCount++;
+			}
+		}
+
+		var str = '$addedCount Layers were imported into the Project.';
+		if (notAddedCount > 0) str += ' $notAddedCount Layers appear to be duplicates, so they were not imported.';
+
+		Popup.open("Imported Layers", "layers-solid", str, ["Okay"]);
+
+		refreshList();
+	}
+
+	public function exportLayers()
+	{
+		var path = FileSystem.chooseSaveFile("Export Layers", [{ name: "Ogmo Layer Templates", extensions: ["json"] }]);
+		if (path.length > 0)
+		{
+			var data = {
+				ogmoVersion: OGMO.version,
+				layers: [for (layer in OGMO.project.layers) layer.save()]
+			};
+			FileSystem.saveJSON(data, path);
+		}
 	}
 }

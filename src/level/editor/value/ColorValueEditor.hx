@@ -1,5 +1,6 @@
 package level.editor.value;
 
+import project.data.value.ColorValueTemplate;
 import util.Popup;
 import util.Fields;
 import project.data.value.ValueTemplate;
@@ -13,6 +14,8 @@ class ColorValueEditor extends ValueEditor
 
 	override function load(template:ValueTemplate, values:Array<Value>):Void
 	{
+		var colorTemplate:ColorValueTemplate = cast template;
+
 		title = template.name;
 
 		// check if values conflict
@@ -36,20 +39,20 @@ class ColorValueEditor extends ValueEditor
 		{
 			Popup.openColorPicker(template.name, conflict ? Color.black : Color.fromHexAlpha(value), function(color)
 			{
-				if (color != null && color.toHexAlpha() != value)
+				if (color != null && !color.equals(Color.fromHexAlpha(value)))
 				{
 					var was = value;
-					value = color.toHexAlpha();
+					value = (colorTemplate.includeAlpha) ? color.toHexAlpha(colorTemplate.includeHashtag) : color.toHex(colorTemplate.includeHashtag);
 
 					// save
-					EDITOR.level.store("Changed " + template.name + " Value from '" + was + "'	to '" + value + "'");
+					EDITOR.currentLevel.store("Changed " + template.name + " Value from '" + was + "'	to '" + value + "'");
 					for (i in 0...values.length) values[i].value = value;
 
 					element.find(".button_text").html(value);
 					conflict = false;
 					EDITOR.dirty();
 				}
-			});
+			}, colorTemplate.includeAlpha, colorTemplate.includeHashtag);
 		});
 	}
 

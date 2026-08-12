@@ -28,7 +28,7 @@ class LayersPanel extends SidePanel
 	{
 		for (i in 0...OGMO.project.layers.length)
 		{
-			if (EDITOR.level.currentLayerID == i) buttons[i].selected();
+			if (EDITOR.currentLayerID == i) buttons[i].selected();
 			else buttons[i].notSelected();
 		}
 	}

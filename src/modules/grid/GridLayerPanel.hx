@@ -2,7 +2,7 @@ package modules.grid;
 
 import level.editor.ui.SidePanel;
 
-class GridPalettePanel extends SidePanel
+class GridLayerPanel extends SidePanel
 {
 	public var layerEditor:GridLayerEditor;
 	public var jqLeftBrush:JQuery;

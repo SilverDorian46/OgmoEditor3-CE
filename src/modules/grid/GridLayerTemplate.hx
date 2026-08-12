@@ -25,6 +25,9 @@ class GridLayerTemplate extends LayerTemplate
 	// TODO - add in 2D vs 1D selection - austin
 	public var arrayMode:Int = ArrayExportModes.ONE;
 	public var legend:Map<String, Color>;
+	public var autotilings:Map<String, String>;
+	public var overlaidBy:String;
+
 	public var transparent(get, never):String;
 	public var firstSolid(get, never):String;
 
@@ -34,6 +37,8 @@ class GridLayerTemplate extends LayerTemplate
 		legend = new Map();
 		legend.set("0", new Color(0, 0, 0, 0));
 		legend.set("1", new Color(0, 0, 0, 1));
+		autotilings = new Map();
+		overlaidBy = "";
 	}
 
 	public var legendchars:String = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -42,6 +47,7 @@ class GridLayerTemplate extends LayerTemplate
 	{
 		var s = super.toString();
 		for (key in legend.keys()) s += key + ": " + legend[key].rgbaString() + "\n";
+		for (key in autotilings.keys()) s += key + ": " + autotilings[key] + "\n";
 		return s;
 	}
 
@@ -61,6 +67,9 @@ class GridLayerTemplate extends LayerTemplate
 		data.arrayMode = arrayMode;
 		data.legend = {};
 		for (key in legend.keys()) untyped data.legend[key] = legend[key].toHexAlpha(); // Reflect.setField(data.legend, key, legend[key].toHexAlpha());
+		data.autotilings = {};
+		for (key in autotilings.keys()) untyped data.autotilings[key] = autotilings[key];
+		data.overlaidBy = overlaidBy;
 		return data;
 	}
 
@@ -71,7 +80,11 @@ class GridLayerTemplate extends LayerTemplate
 		arrayMode = data.arrayMode;
 		legend = new Map();
 		for (field in Reflect.fields(data.legend))
-				legend.set(field, Color.fromHexAlpha(Reflect.field(data.legend, field)));
+			legend.set(field, Color.fromHexAlpha(Reflect.field(data.legend, field)));
+		autotilings = new Map();
+		for (field in Reflect.fields(data.autotilings))
+			autotilings.set(field, Reflect.field(data.autotilings, field));
+		overlaidBy = data.overlaidBy;
 
 		return this;
 	}

@@ -30,7 +30,7 @@ class TilePalettePanel extends SidePanel
 	public var columns(get, never):Int;
 	public var rows(get, never):Int;
 
-	function get_tileset():Tileset { return (cast layerEditor.layer : TileLayer).tileset; }
+	function get_tileset():Tileset { return (cast layerEditor.getLayerFromCurrentLevel() : TileLayer).tileset; }
 	function get_columns():Int { return tileset.tileColumns; }
 	function get_rows():Int { return tileset.tileRows; }
 
@@ -59,8 +59,8 @@ class TilePalettePanel extends SidePanel
 			options.change(function(e)
 			{
 				var next = OGMO.project.tilesets[Imports.integer(options.val(), 0)];
-				EDITOR.level.store("Set " + layerEditor.template.name + " to '" + next.label + "'");
-				(cast layerEditor.layer : TileLayer).tileset = next;
+				EDITOR.currentLevel.store("Set " + layerEditor.template.name + " to '" + next.label + "'");
+				(cast layerEditor.getLayerFromCurrentLevel() : TileLayer).tileset = next;
 				refresh();
 			});
 			options.val(current.string());
@@ -80,7 +80,7 @@ class TilePalettePanel extends SidePanel
 			{
 				mousedown = true;
 				mouseDown(e);
-				intervalId = Browser.window.setInterval(function() { if (EDITOR.level != null) mouseMove(null); }, 50);
+				intervalId = Browser.window.setInterval(function() { if (EDITOR.currentLevel != null) mouseMove(null); }, 50);
 			});
 
 			// mouse up
@@ -196,7 +196,7 @@ class TilePalettePanel extends SidePanel
 
 	public function mouseUp(e:Event):Void
 	{
-		if (EDITOR.level == null || tileset == null) return;
+		if (EDITOR.currentLevel == null || tileset == null) return;
 		var tile = getMouseTile(e);
 		if (selectionActive)
 		{
@@ -263,16 +263,15 @@ class TilePalettePanel extends SidePanel
 		context.imageSmoothingEnabled = false;
 
 		var tileset = tileset;
-		var image = tileset.texture.image;
+		var subtexture = tileset.texture;
+		var image = subtexture.texture.image;
 		var spacing = spacing;
 
 		if (tileset != null)
 		{
 			if (image.width <= 0)
 			{
-				image.addEventListener("load", function (e) {
-					refresh();
-				}, { once: true });
+				image.addEventListener("load", function (e) { refresh(); }, { once: true });
 				return;
 			}
 
@@ -281,11 +280,13 @@ class TilePalettePanel extends SidePanel
 
 			// draw tiles (+transparent bg)
 			context.fillStyle = "rgb(200,200,200)";
-			var tx = tileset.tileSeparationX + tileset.tileMarginX, x = 0;
-			while(tx < image.width - tileset.tileMarginX)
+			var tx = subtexture.sourceX + tileset.tileSeparationX + tileset.tileMarginX;
+			var x = 0;
+			while(tx < subtexture.sourceRect.right - tileset.tileMarginX)
 			{
-				var ty = tileset.tileSeparationY + tileset.tileMarginY, y = 0;
-				while(ty < image.height - tileset.tileMarginY)
+				var ty = subtexture.sourceY + tileset.tileSeparationY + tileset.tileMarginY;
+				var y = 0;
+				while(ty < subtexture.sourceRect.bottom - tileset.tileMarginY)
 				{
 					var drawX = x * (tileset.tileWidth + spacing);
 					var drawY = y * (tileset.tileHeight + spacing);

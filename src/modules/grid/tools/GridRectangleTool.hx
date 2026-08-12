@@ -1,5 +1,7 @@
 package modules.grid.tools;
 
+import level.data.Level;
+
 class GridRectangleTool extends GridTool
 {
 	public var drawing:Bool = false;
@@ -8,10 +10,12 @@ class GridRectangleTool extends GridTool
 	public var end:Vector = new Vector();
 	public var rect:Rectangle = new Rectangle();
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (drawing && rect.width > 0 && rect.height > 0)
 		{
+			var offset = level.data.offset;
+
 			var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 			var w = rect.width * layer.template.gridSize.x;
 			var h = rect.height * layer.template.gridSize.y;
@@ -20,7 +24,7 @@ class GridRectangleTool extends GridTool
 				col = Color.red;
 			col = col.x(0.5);
 
-			EDITOR.overlay.drawRect(at.x, at.y, w, h, col);
+			EDITOR.overlay.drawRect(at.x + offset.x, at.y + offset.y, w, h, col);
 		}
 	}
 
@@ -92,8 +96,10 @@ class GridRectangleTool extends GridTool
 	{
 		if (anyChanges)
 		{
-			EDITOR.level.store("rectangle fill");
+			EDITOR.currentLevel.store("rectangle fill");
 			for (i in 0...rect.width.int()) for (j in 0...rect.height.int()) layer.data[rect.x.int() + i][rect.y.int() + j] = brush;
+
+			layer.signalForAutotiler();
 		}
 	}
 

@@ -36,7 +36,7 @@ class Ogmo
 	public var root:String = untyped Remote.app.getAppPath();
 	public var execDir(get, never):String;
 
-	public var project(default, set):Project = null;
+	public var project(default, null):Project = null;
 	public var startTime(default, null):Float = js.lib.Date.now();
 	public var lastTime(default, null):Float = js.lib.Date.now();
 	public var deltaTime(default, null):Float = 0;
@@ -183,9 +183,9 @@ class Ogmo
 		if (ogmo.project != null)
 		{
 			str = " " + ogmo.project.name + "   |" + str;
-			if (editor.active && editor.level != null)
+			if (editor.active && editor.currentLevel != null)
 			{
-				str = " " + editor.level.displayName + "   |  " + str;
+				str = " " + editor.currentLevel.displayName + "   |  " + str;
 				edited = true;
 			}
 		}
@@ -198,6 +198,18 @@ class Ogmo
 	function startup() 
 	{
 
+	}
+
+	public function setProject(project: Project, onSet: () -> Void, overrideOnSet: Bool = false): Void
+	{
+		this.project = project;
+		if (!overrideOnSet && this.project != null) editor.onSetProject(onSet);
+		else onSet();
+	}
+
+	public function unsetProject(): Void
+	{
+		this.project = null;
 	}
 
 	/*
@@ -327,12 +339,5 @@ class Ogmo
 			return root;
 		else
 			return Path.dirname(process.execPath);
-	}
-
-	function set_project(value:Project):Project
-	{
-		project = value;
-		if (project != null) editor.onSetProject();
-		return project;
 	}
 }

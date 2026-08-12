@@ -1,5 +1,7 @@
 package modules.entities.tools;
 
+import level.data.Level;
+
 class EntityResizeTool extends EntityTool
 {
 
@@ -12,13 +14,17 @@ class EntityResizeTool extends EntityTool
 	public var canResizeX:Bool = false;
 	public var canResizeY:Bool = false;
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (!resizing) return;
-		EDITOR.overlay.drawLine(start, mousePos, Color.white);
-		EDITOR.overlay.drawLineNode(start, 10 / EDITOR.level.zoom, Color.green);
-		if (canResizeX) EDITOR.overlay.drawLine(start, new Vector(lastPos.x, start.y), Color.green);
-		if (canResizeY) EDITOR.overlay.drawLine(start, new Vector(start.x, lastPos.y), Color.green);
+
+		var drawStart = EDITOR.levelToGlobal(start, level);
+		var drawLast = EDITOR.levelToGlobal(lastPos, level);
+
+		EDITOR.overlay.drawLine(drawStart, mousePos, Color.white);
+		EDITOR.overlay.drawLineNode(drawStart, 10 / EDITOR.zoom, Color.green);
+		if (canResizeX) EDITOR.overlay.drawLine(drawStart, new Vector(drawLast.x, drawStart.y), Color.green);
+		if (canResizeY) EDITOR.overlay.drawLine(drawStart, new Vector(drawStart.x, drawLast.y), Color.green);
 	}
 
 	override public function onMouseDown(pos:Vector)
@@ -65,7 +71,7 @@ class EntityResizeTool extends EntityTool
 		{
 			if (!changed)
 			{
-				EDITOR.level.store("resize entities");
+				EDITOR.currentLevel.store("resize entities");
 				changed = true;
 			}
 			entity.resetSize();
@@ -84,13 +90,14 @@ class EntityResizeTool extends EntityTool
 		}
 
 		if (!OGMO.ctrl) layer.snapToGrid(pos, pos);
+		else layer.snapToPixel(pos, pos);
 
 		if (!pos.equals(lastPos))
 		{
 			if (!firstChange)
 			{
 				firstChange = true;
-				EDITOR.level.store("resize entities");
+				EDITOR.currentLevel.store("resize entities");
 			}
 
 			var diff = new Vector(pos.x - start.x, pos.y - start.y);
@@ -108,7 +115,7 @@ class EntityResizeTool extends EntityTool
 	override public function keyToolAlt():Int return 1;
 	override public function keyToolShift():Int return 3;
 	override function isAvailable():Bool {
-		for (entity in layerEditor.entities.list) {
+		for (entity in layerEditor.getEntitiesFromCurrentLevel().list) {
 			for (e_id in layerEditor.selection.ids) if (entity.id == e_id && (entity.template.resizeableX || entity.template.resizeableY)) return true;
 		}
 		return false;

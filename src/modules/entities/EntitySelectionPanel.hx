@@ -48,7 +48,7 @@ class EntitySelectionPanel extends SidePanel
 
 	override public function refresh()
 	{
-		var ent_layer:EntityLayer = cast layerEditor.layer;
+		var ent_layer:EntityLayer = cast layerEditor.getLayerFromCurrentLevel();
 		var sel = ent_layer.entities.getGroup(layerEditor.selection);
 
 		// list of entities
@@ -120,14 +120,14 @@ class EntitySelectionPanel extends SidePanel
 					var pos = Fields.getVector(entityPos);
 					if (!pos.x.isNaN() && entity.position.x != pos.x)
 					{
-						EDITOR.level.store("Changed Entity X Position from '" + entity.position.x + "'  to '" + pos.x + "'");
+						EDITOR.currentLevel.store("Changed Entity X Position from '" + entity.position.x + "'  to '" + pos.x + "'");
 
 						for (entity in sel) {
 							var diff = entity.position.x - pos.x;
 							entity.move(new Vector(-diff, 0));
 						}
 
-						EDITOR.level.unsavedChanges = true;
+						EDITOR.currentLevel.unsavedChanges = true;
 						EDITOR.dirty();
 					}
 				});
@@ -135,14 +135,14 @@ class EntitySelectionPanel extends SidePanel
 					var pos = Fields.getVector(entityPos);
 					if (!pos.y.isNaN() && entity.position.y != pos.y)
 					{
-						EDITOR.level.store("Changed Entity Y Position from '" + entity.position.y + "'  to '" + pos.y + "'");
+						EDITOR.currentLevel.store("Changed Entity Y Position from '" + entity.position.y + "'  to '" + pos.y + "'");
 
 						for (entity in sel) {
 							var diff = entity.position.y - pos.y;
 							entity.move(new Vector(0, -diff));
 						}
 
-						EDITOR.level.unsavedChanges = true;
+						EDITOR.currentLevel.unsavedChanges = true;
 						EDITOR.dirty();
 					}
 				});
@@ -154,6 +154,7 @@ class EntitySelectionPanel extends SidePanel
 				var showHeight = true;
 				var showFlipX = true;
 				var showFlipY = true;
+				var showColor = true;
 				for (entity in sel)
 				{
 					if (showRot && !entity.template.rotatable) showRot = false;
@@ -161,6 +162,7 @@ class EntitySelectionPanel extends SidePanel
 					if (showHeight && !entity.template.resizeableY) showHeight = false;
 					if (showFlipX && !entity.template.canFlipX) showFlipX = false;
 					if (showFlipY && !entity.template.canFlipY) showFlipY = false;
+					if (showColor && !entity.template.canSetColor) showColor = false;
 				}
 
 				if (showRot)
@@ -170,14 +172,14 @@ class EntitySelectionPanel extends SidePanel
 						var rot = Std.parseFloat(Fields.getField(entityRot));
 						if (!rot.isNaN() && entity.rotation != rot)
 						{
-							EDITOR.level.store("Changed Entity Rotation from '" + entity.rotation + "'  to '" + rot + "'");
+							EDITOR.currentLevel.store("Changed Entity Rotation from '" + entity.rotation + "'  to '" + rot + "'");
 
 							for (entity in sel) {
 								entity.rotation = Calc.snap(rot, 360 / entity.template.rotationDegrees);
 								entity.updateMatrix();
 							}
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 						}
 					});
@@ -191,7 +193,7 @@ class EntitySelectionPanel extends SidePanel
 						var width = Std.parseFloat(Fields.getField(entityWidth));
 						if (!width.isNaN() && entity.size.x != width)
 						{
-							EDITOR.level.store("Changed Entity Rotation from '" + entity.size.x + "'  to '" + width + "'");
+							EDITOR.currentLevel.store("Changed Entity Rotation from '" + entity.size.x + "'  to '" + width + "'");
 
 							for (entity in sel) {
 								var diff = width - entity.size.x;
@@ -199,7 +201,7 @@ class EntitySelectionPanel extends SidePanel
 								entity.resize(new Vector(diff,0));
 							}
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 						}
 					});
@@ -213,7 +215,7 @@ class EntitySelectionPanel extends SidePanel
 						var height = Std.parseFloat(Fields.getField(entityHeight));
 						if (!height.isNaN() && entity.size.y != height)
 						{
-							EDITOR.level.store("Changed Entity Rotation from '" + entity.size.y + "'  to '" + height + "'");
+							EDITOR.currentLevel.store("Changed Entity Rotation from '" + entity.size.y + "'  to '" + height + "'");
 
 							for (entity in sel) {
 								var diff = height - entity.size.y;
@@ -221,7 +223,7 @@ class EntitySelectionPanel extends SidePanel
 								entity.resize(new Vector(0, diff));
 							}
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 						}
 					});
@@ -233,7 +235,7 @@ class EntitySelectionPanel extends SidePanel
 					var entityFlipX = Fields.createCheckbox(entity.flippedX,"Flipped X");
 					entityFlipX.on("click", function(e) {
 							var flipped = !sel[0].flippedX;
-							EDITOR.level.store("Changed Entity Flipped X to '" + (flipped ? "True'" : "False'"));
+							EDITOR.currentLevel.store("Changed Entity Flipped X to '" + (flipped ? "True'" : "False'"));
 
 							sel[0].flippedX = flipped;
 
@@ -242,7 +244,7 @@ class EntitySelectionPanel extends SidePanel
 								if (entity.template.canFlipX) entity.flippedX = flipped;
 							}
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 					});
 					Fields.createSettingsBlock(properties, entityFlipX, SettingsBlock.Full, "Flipped X", SettingsBlock.OverTitle);
@@ -253,7 +255,7 @@ class EntitySelectionPanel extends SidePanel
 					var entityFlipY = Fields.createCheckbox(entity.flippedY,"Flipped Y");
 					entityFlipY.on("click", function(e) {
 							var flipped = !sel[0].flippedY;
-							EDITOR.level.store("Changed Entity Flipped Y to '" + (flipped ? "True'" : "False'"));
+							EDITOR.currentLevel.store("Changed Entity Flipped Y to '" + (flipped ? "True'" : "False'"));
 
 							sel[0].flippedY = flipped;
 
@@ -262,10 +264,30 @@ class EntitySelectionPanel extends SidePanel
 								if (entity.template.canFlipY) entity.flippedY = flipped;
 							}
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 					});
 					Fields.createSettingsBlock(properties, entityFlipY, SettingsBlock.Full, "Flipped Y", SettingsBlock.OverTitle);
+				}
+
+				if (showColor)
+				{
+					var entityColor = Fields.createColor("Color", entity.color, entity.template.includeAlpha, entity.template.includeHashtag, null, function (c) {
+						if (!entity.color.equals(c)) {
+							EDITOR.currentLevel.store("Changed Entity Color from '" + entity.color.toHexAlpha() + "' to '" + c.toHexAlpha() + "'");
+
+							entity.color = c;
+
+							for (i in 1...sel.length) {
+								var next = sel[i];
+								if (next.template.canSetColor) next.color = c;
+							}
+
+							EDITOR.currentLevel.unsavedChanges = true;
+							EDITOR.dirty();
+						}
+					});
+					Fields.createSettingsBlock(properties, entityColor, SettingsBlock.Full, "Color", SettingsBlock.OverTitle);
 				}
 			}
 		}

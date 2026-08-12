@@ -4,6 +4,7 @@ import js.html.CanvasElement;
 import js.html.CanvasRenderingContext2D;
 import level.data.Level;
 
+// unused class
 class OverlayRenderer
 {
 
@@ -43,7 +44,7 @@ class OverlayRenderer
 		context.translate(canvas.width/2, canvas.height/2);
 	}
 	
-	public function prepareForLevel(level:Level)
+	/*public function prepareForLevel(level:Level)
 	{
 		context.transform(level.camera.a, level.camera.b, level.camera.c, level.camera.d, level.camera.tx, level.camera.ty);
 		
@@ -66,7 +67,7 @@ class OverlayRenderer
 	public function resetLineWidth(level:Level)
 	{
 		context.lineWidth = 2 / level.zoom;
-	}
+	}*/
 	
 	public function dashedLineMode()
 	{

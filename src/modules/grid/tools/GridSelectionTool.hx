@@ -1,5 +1,7 @@
 package modules.grid.tools;
 
+import level.data.Level;
+
 class GridSelectionTool extends GridTool
 {
 
@@ -17,27 +19,29 @@ class GridSelectionTool extends GridTool
 		deselectTiles();
 	}
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		switch (mode) {
-			case None, Select: selectOverlay();
-			case Move: moveOverlay();
+			case None, Select: selectOverlay(level);
+			case Move: moveOverlay(level);
 		}	
 	}
 
-	function selectOverlay()
+	function selectOverlay(level: Level)
 	{
 		if (rect.width <= 0 || rect.height <= 0) return;
+		var offset = level.data.offset;
 		var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 		var w = rect.width * layer.template.gridSize.x;
 		var h = rect.height * layer.template.gridSize.y;
-		EDITOR.overlay.drawRect(at.x, at.y, w, h, Color.green.x(0.1));
-		EDITOR.overlay.drawRectLines(at.x, at.y, w, h, Color.green);
+		EDITOR.overlay.drawRect(at.x + offset.x, at.y + offset.y, w, h, Color.green.x(0.2));
+		EDITOR.overlay.drawRectLines(at.x + offset.x, at.y + offset.y, w, h, Color.green);
 	}
 
-	function moveOverlay()
+	function moveOverlay(level: Level)
 	{
 		if (rect.width <= 0 || rect.height <= 0) return;
+		var offset = level.data.offset;
 		var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 		var trueAt = layer.gridToLevel(new Vector(freeRect.x, freeRect.y));
 		var w = rect.width * layer.template.gridSize.x;
@@ -50,12 +54,12 @@ class GridSelectionTool extends GridTool
 			if (!layer.insideGrid(new Vector(freeRect.x + x, freeRect.y + y))) continue;
 			if (id == '0')
 			{
-				if (!OGMO.ctrl) EDITOR.overlay.drawRect(cur.x, cur.y, layer.template.gridSize.x, layer.template.gridSize.y, Color.red.x(0.25));
+				if (!OGMO.ctrl) EDITOR.overlay.drawRect(cur.x + offset.x, cur.y + offset.y, layer.template.gridSize.x, layer.template.gridSize.y, Color.red.x(0.5));
 				continue;
 			}
-			EDITOR.overlay.drawRect(cur.x, cur.y, layer.template.gridSize.x, layer.template.gridSize.y, (cast layer.template:GridLayerTemplate).legend[id]);
+			EDITOR.overlay.drawRect(cur.x + offset.x, cur.y + offset.y, layer.template.gridSize.x, layer.template.gridSize.y, (cast layer.template:GridLayerTemplate).legend[id]);
 		}
-		EDITOR.overlay.drawRectLines(at.x - 2, at.y - 2, w + 4, h + 4, Color.yellow);
+		EDITOR.overlay.drawRectLines(at.x + offset.x - 2, at.y + offset.y - 2, w + 4, h + 4, Color.yellow);
 	}
 
 	override public function onMouseDown(pos:Vector)
@@ -74,7 +78,7 @@ class GridSelectionTool extends GridTool
 
 	function moveStart(pos:Vector)
 	{
-		EDITOR.level.store('move grid selection');
+		EDITOR.currentLevel.store('move grid selection');
 		layer.levelToGrid(pos, pos);
 		pos.clone(lastPos);
 		mode = Move;
@@ -85,6 +89,8 @@ class GridSelectionTool extends GridTool
 		for (x in 0...rect.width.int()) for (y in 0...rect.height.int())
 			if (selection[x][y] != '0') layer.data[rect.x.int() + x][rect.y.int() + y] = '0';
 		EDITOR.dirty();
+
+		layer.signalForAutotiler();
 	}
 
 	override public function onMouseMove(pos:Vector)
@@ -141,6 +147,8 @@ class GridSelectionTool extends GridTool
 				layer.data[freeRect.x.int() + x][freeRect.y.int() + y] = selection[x][y];
 		}
 		EDITOR.dirty();
+
+		layer.signalForAutotiler();
 	}
 
 	override public function onRightDown(pos:Vector)
@@ -183,6 +191,8 @@ class GridSelectionTool extends GridTool
 		}
 		EDITOR.dirty();
 		deselectTiles();
+
+		layer.signalForAutotiler();
 	}
 
 	function updateRect()

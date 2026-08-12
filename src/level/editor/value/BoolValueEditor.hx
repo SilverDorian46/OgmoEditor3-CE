@@ -65,7 +65,7 @@ class BoolValueEditor extends ValueEditor
 			}
 
 			// save
-			EDITOR.level.store("Changed " + template.name + " Value from '" + was + "'	to '" + value + "'");
+			EDITOR.currentLevel.store("Changed " + template.name + " Value from '" + was + "'	to '" + value + "'");
 			for (i in 0...values.length) values[i].value = value;
 			conflict = false;
 			EDITOR.dirty();

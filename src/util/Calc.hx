@@ -11,6 +11,16 @@ class Calc
 		return Math.max(Math.min(num, max), min);
 	}
 
+	public static function clampMap(num:Float, min:Float, max:Float, toMin:Float, toMax:Float):Float
+	{
+		return clamp((num - min) / (max - min), 0, 1) * (toMax - toMin) + toMin;
+	}
+
+	public static function lerp(from:Float, to:Float, amount:Float):Float
+	{
+		return from + ((to - from) * amount);
+	}
+
 	public static function snap(num:Float, interval:Float, ?offset:Float):Float
 	{
 		if (offset == null) offset = 0;
@@ -145,5 +155,25 @@ class Calc
 		num = num * Math.pow(10, precision);
 		num = Math.round( num ) / Math.pow(10, precision);
 		return num;
+	}
+
+	public static function mod(x:Float, m:Float):Float
+	{
+		return ((x % m) + m) % m;
+	}
+
+	public static function minInt(a:Int, b:Int)
+	{
+		return a > b ? b : a;
+	}
+
+	public static function maxInt(a:Int, b:Int)
+	{
+		return a < b ? b : a;
+	}
+
+	public static function clampInt(num:Int, min:Int, max:Int):Int
+	{
+		return maxInt(minInt(num, max), min);
 	}
 }

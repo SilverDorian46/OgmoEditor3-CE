@@ -15,6 +15,8 @@ import electron.renderer.Remote;
 
 class FileSystem
 {
+	public static final supportedImageExts = [".png", ".jpeg", ".jpg", ".bmp"];
+
 	// Resolves ., .., // + converts \ to /
 	public static function normalize(path:String):String
 	{
@@ -120,6 +122,18 @@ class FileSystem
 			var b = Buffer.from(Fs.readFileSync(path));
 			image.src = "data:image/png;base64," + b.toString("base64");
 			return image;
+		}
+		return null;
+	}
+
+	public static function loadImageFromRelativePath(path: String, ?relativeTo: String): ImageElement
+	{
+		if (relativeTo == null) relativeTo = js.node.Path.dirname(OGMO.project.path);
+		var fullPath = js.node.Path.join(relativeTo, path);
+		for (ext in supportedImageExts)
+		{
+			var image = loadImage(normalize(fullPath + ext));
+			if (image != null) return image;
 		}
 		return null;
 	}

@@ -266,6 +266,19 @@ class ItemListNode
 		}
 	}
 
+	public function sort(recursive: Bool): Void
+	{
+		children.sort(function (a, b)
+		{
+			var nameA = a.label.toLowerCase();
+			var nameB = b.label.toLowerCase();
+			return (nameA < nameB) ? -1 : (nameA > nameB) ? 1 : 0;
+		});
+
+		if (recursive) for (child in children) if (child.isOfType(ItemListFolder))
+			child.sort(true);
+	}
+
 	public function perform(action:ItemListNode->Void):Void
 	{
 		action(this);

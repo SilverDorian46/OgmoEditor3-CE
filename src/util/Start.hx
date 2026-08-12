@@ -1,5 +1,6 @@
 package util;
 
+import modules.autotiler.ProjectAutotilerPanel;
 import project.data.value.*;
 import project.editor.ProjectLayersPanel;
 import project.editor.ProjectGeneralPanel;
@@ -27,6 +28,7 @@ class Start {
 		ProjectLayersPanel.startup();
 		ProjectTilesetsPanel.startup();
 		ProjectEntitiesPanel.startup();
+		ProjectAutotilerPanel.startup();
 
 		// Modules
 		TileLayerTemplate.startup();

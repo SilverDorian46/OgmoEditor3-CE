@@ -13,6 +13,6 @@ class EntityTool extends Tool
 	public var layer(get, never):EntityLayer;
 	function get_layer():EntityLayer
 	{
-		return cast EDITOR.level.currentLayer;
+		return cast EDITOR.currentLevel.currentLayer;
 	} 
 }

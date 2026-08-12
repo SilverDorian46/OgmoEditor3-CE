@@ -74,7 +74,7 @@ class FloatingHTML
 
     public function setCanvasPosition(pos:Vector, alignX:PositionAlignH = PositionAlignH.Left, alignY:PositionAlignV = PositionAlignV.Top)
     {
-        var screenSpace = EDITOR.level.camera.transformPoint(pos);
+        var screenSpace = EDITOR.camera.transformPoint(pos);
         screenSpace.x += EDITOR.draw.width / 2;
         screenSpace.y += EDITOR.draw.height / 2;
         var x = Math.floor(screenSpace.x);
@@ -182,7 +182,7 @@ class FloatingHTMLPropertyDisplay extends FloatingHTML
                 else if (val.template.definition.type == TextValueTemplate)
                     htmlString += '<p>« ${val.value} »</p>';
             }
-            else
+            else if (val.template.display == ValueDisplayType.NameAndValue)
             {
                 if (val.template.definition.type == BoolValueTemplate)
                     if (val.value == true)
@@ -205,6 +205,7 @@ class FloatingHTMLPropertyDisplay extends FloatingHTML
                     htmlString += '<p>${val.template.name} = « ${val.value} »</p>';
             }
         }
+        htmlString += '<p>${entity.template.name} : ${entity.id}</p>';
         setHTML(htmlString);
     }
 

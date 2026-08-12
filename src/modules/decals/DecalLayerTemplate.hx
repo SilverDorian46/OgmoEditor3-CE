@@ -1,5 +1,6 @@
 package modules.decals;
 
+import rendering.Subtexture;
 import js.node.Path;
 import level.editor.Tool;
 import level.data.Level;
@@ -15,12 +16,18 @@ import modules.decals.tools.DecalResizeTool;
 import modules.decals.tools.DecalRotateTool;
 import util.Klaw;
 
+typedef PathTexturePair = {
+	path: String,
+	texture: Subtexture
+}
+
 typedef Files = 
 {
 	?name: String,
 	?dirname:String,
 	?parent: Files,
-	?textures: Array<Dynamic>,
+	?texturePaths: Array<String>,
+	?textures: Array<PathTexturePair>,
 	?subdirs: Array<Files>
 }
 
@@ -42,9 +49,13 @@ class DecalLayerTemplate extends LayerTemplate
 	public var includeImageSequence:Bool = true;
 	public var values:Array<ValueTemplate> = [];
 	public var files:Files = {};
-	public var textures:Array<Texture> = [];
+	//public var textures:Array<Texture> = [];
+	public var textures:Map<String, Subtexture> = [];
 	public var scaleable:Bool;
 	public var rotatable:Bool;
+	public var canSetColor:Bool;
+	public var includeAlpha:Bool;
+	public var includeHashtag:Bool;
 	public var doRefresh:Void->Void;
 
 	var walker:Walker;
@@ -66,6 +77,9 @@ class DecalLayerTemplate extends LayerTemplate
 		data.includeImageSequence = includeImageSequence;
 		data.scaleable = scaleable;
 		data.rotatable = rotatable;
+		data.canSetColor = canSetColor;
+		data.includeAlpha = includeAlpha;
+		data.includeHashtag = includeHashtag;
 		data.values = ValueTemplate.saveList(values);
 		return data;
 	}
@@ -77,13 +91,16 @@ class DecalLayerTemplate extends LayerTemplate
 		includeImageSequence = data.includeImageSequence;
 		scaleable = data.scaleable;
 		rotatable = data.rotatable;
+		canSetColor = data.canSetColor;
+		includeAlpha = data.includeAlpha;
+		includeHashtag = data.includeHashtag;
 		values = ValueTemplate.loadList(data.values);
 		return this;
 	}
 
 	override function projectWasLoaded(project:Project):Void
 	{
-		files = { name: "root", parent: null, textures: [], subdirs: [] };
+		files = { name: "root", parent: null, texturePaths: [], textures: [], subdirs: [] };
 
 		function recursiveAdd(item:Item, parent:Files):Bool
 		{
@@ -94,12 +111,12 @@ class DecalLayerTemplate extends LayerTemplate
 				// add to parent
 				if (item.stats.isDirectory())
 				{
-					var obj = { name: Path.basename(item.path), dirname: dirname, parent: parent, textures: [], subdirs: [] };
+					var obj = { name: Path.basename(item.path), dirname: dirname, parent: parent, texturePaths: [], textures: [], subdirs: [] };
 					parent.subdirs.push(obj);
 				}
 				else if (item.stats.isFile())
 				{
-					parent.textures.push(haxe.io.Path.normalize(item.path));
+					parent.texturePaths.push(haxe.io.Path.normalize(item.path));
 				}
 				return true;
 			}
@@ -131,7 +148,7 @@ class DecalLayerTemplate extends LayerTemplate
 					function removeSequence (obj:Files)
 					{
 						// remove sequence
-						obj.textures.sort(function(a, b)
+						obj.texturePaths.sort(function(a, b)
 						{
 							if(a < b) return -1;
 							if(a > b) return 1;
@@ -140,27 +157,27 @@ class DecalLayerTemplate extends LayerTemplate
 
 						var newList:Array<String> = [];
 						var lastName = "";
-						for (texture in obj.textures)
+						for (texPath in obj.texturePaths)
 						{
 							// get next name
-							var nextName = Path.basename(texture);
-							// TODO - willl have to double check this
-							nextName = '.' + nextName.split(".").pop();
+							var nextName = Path.basename(texPath);
+							nextName = nextName.substr(0, nextName.length - Path.extname(nextName).length);
 							
 							// remove numbers
 							var lastNumber = nextName.length - 1;
-							while (lastNumber >= 0 && !nextName.charAt(lastNumber).parseInt().isNaN()) lastNumber --;
+							while (lastNumber >= 0 && nextName.charAt(lastNumber).parseInt() != null)
+								lastNumber --;
 							nextName = nextName.substr(0, lastNumber + 1);
 
 							// check if the last name was the same
 							if (lastName == "" || lastName != nextName)
 							{
 								lastName = nextName;
-								newList.push(texture);
+								newList.push(texPath);
 							}
 						}
 
-						obj.textures = newList;
+						obj.texturePaths = newList;
 
 						// do the same on subdirectories
 						for	(subdir in obj.subdirs) removeSequence(subdir);
@@ -172,19 +189,29 @@ class DecalLayerTemplate extends LayerTemplate
 				// load textures
 				function loadTextures (obj:Files)
 				{
-					var textures = [];
-					for (texture in obj.textures)
+					var textures: Array<PathTexturePair> = [];
+					for (texPath in obj.texturePaths)
 					{
-						var ext = Path.extname(texture);
-						if (ext != ".png" && ext != ".jpeg" && ext != ".jpg" && ext != ".bmp")
+						var ext = Path.extname(texPath);
+						//if (ext != ".png" && ext != ".jpeg" && ext != ".jpg" && ext != ".bmp")
+						if (!FileSystem.supportedImageExts.contains(ext))
 							continue;
 							
-						var tex = Texture.fromFile(texture);
+						/*var tex = Texture.fromFile(texPath);
 						if (tex != null)
 						{
-							tex.path = Path.relative(Path.dirname(project.path), texture);
+							tex.path = Path.normalize(Path.relative(Path.dirname(project.path), texPath));
 							this.textures.push(tex);
 							textures.push(tex);
+						}*/
+
+						var subpath = Path.normalize(Path.relative(Path.dirname(project.path), texPath));
+						//var subtex = project.atlas.getOrCreate(subpath);
+						var subtex = project.atlas.get(subpath);
+						if (subtex != null)
+						{
+							this.textures.set(subpath, subtex);
+							textures.push({ path: subpath, texture: subtex });
 						}
 					}
 
@@ -201,9 +228,10 @@ class DecalLayerTemplate extends LayerTemplate
 
 	override function projectWasUnloaded()
 	{
-		for (texture in textures) texture.dispose();
-		textures = [];
-		files = { name: "root", parent: null, textures: [], subdirs: [] };
+		//for (texture in textures) texture.dispose();
+		//textures = [];
+		textures.clear();
+		files = { name: "root", parent: null, texturePaths: [], textures: [], subdirs: [] };
 		if (walker != null) walker.destroy();
 	}
 }

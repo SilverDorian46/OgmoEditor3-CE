@@ -1,11 +1,13 @@
 package project.data;
 
+import rendering.Atlas;
 import electron.renderer.Remote;
 import js.lib.Date;
 import js.node.Path;
 import io.Export;
 import io.Imports;
 import project.data.value.ValueTemplate;
+import modules.autotiler.AutotilerDefinition;
 import modules.entities.EntityTemplate;
 import modules.entities.EntityTemplateList;
 import util.Color;
@@ -25,6 +27,8 @@ class Project
 	public var directoryDepth:Int = 5;
 	public var layerGridDefaultSize = new Vector(8, 8);
 
+	public var levelScreenSize:Vector = new Vector(320, 240);
+
 	public var levelDefaultSize:Vector = new Vector(320, 240);
 	public var levelMinSize:Vector = new Vector(128, 128);
 	public var levelMaxSize:Vector = new Vector(4096, 4096);
@@ -33,6 +37,7 @@ class Project
 	public var entities:EntityTemplateList = new EntityTemplateList();
 	public var layers:Array<LayerTemplate> = [];
 	public var tilesets:Array<Tileset> = [];
+	public var autotilerDefinitions:Array<AutotilerDefinition> = [];
 
 	//Not exported
 	public var path:String;
@@ -40,17 +45,58 @@ class Project
 	public var _nextUnsavedLevelID:Int = 0;
 	public var projectHooks:ProjectHooks;
 
-	public function new(path:String)
+	public var atlas: Atlas;
+
+	inline function new() {}
+
+	public static function createNew(path: String, onReturn: Project -> Void): Void
 	{
-		this.name = "New Project";
-		this.path = Path.resolve(path);
-		this.projectHooks = new ProjectHooks();
+		var self = new Project();
+
+		self.name = "New Project";
+		self.path = Path.resolve(path);
+		self.projectHooks = new ProjectHooks();
+
+		var rootdir = js.node.Path.dirname(path);
+		var imageMap: Map<String, js.html.ImageElement> = [];
+		function recursiveGetImages(dir: String, dirFromRoot: String)
+		{
+			for (filename in FileSystem.readDirectory(dir))
+			{
+				var filepath = js.node.Path.join(dir, filename);
+				var pathFromRoot = FileSystem.normalize(js.node.Path.join(dirFromRoot, filename));
+				if (!sys.FileSystem.isDirectory(filepath))
+				{
+					var ext = js.node.Path.extname(filepath);
+					if (FileSystem.supportedImageExts.contains(ext))
+					{
+						var img = FileSystem.loadImage(FileSystem.normalize(filepath));
+						if (img != null) imageMap.set(pathFromRoot.substr(0, pathFromRoot.length - ext.length), img);
+					}
+				}
+				else recursiveGetImages(filepath, pathFromRoot);
+			}
+		}
+		recursiveGetImages(rootdir, "");
+
+		Atlas.generate(imageMap, rootdir, 4096, 4096, null, function(atlas)
+		{
+			self.atlas = atlas;
+
+			var subtextureCount = 0;
+			for (_ in atlas.subtextures.keys()) subtextureCount++;
+			trace('atlas: { rootPath: ${atlas.rootPath}, subtexture count: ${subtextureCount} }');
+
+			onReturn(self);
+		});
 	}
 	
 	public function unload()
 	{
 		for (layer in layers) layer.projectWasUnloaded();
-		for (tileset in tilesets) tileset.texture.dispose();
+		//for (tileset in tilesets) tileset.texture.dispose();
+
+		atlas.dispose();
 	}
 
 	public function getEntityTemplate(id:Int):EntityTemplate
@@ -69,6 +115,18 @@ class Project
 	{
 		for (tileset in tilesets) if (tileset.label == name) return tileset;
 		if (tilesets.length > 0) return tilesets[0];
+		return null;
+	}
+
+	public function getTilesetStrict(name:String):Tileset
+	{
+		for (tileset in tilesets) if (tileset.label == name) return tileset;
+		return null;
+	}
+
+	public function getAutotilerDefinition(name:String):AutotilerDefinition
+	{
+		for (def in autotilerDefinitions) if (def.label == name) return def;
 		return null;
 	}
 
@@ -146,9 +204,10 @@ class Project
 		anglesRadians = data.anglesRadians;
 		directoryDepth = data.directoryDepth;
 		if (data.layerGridDefaultSize != null) layerGridDefaultSize = Vector.load(data.layerGridDefaultSize);
-		levelDefaultSize = Vector.load(data.levelDefaultSize);
-		levelMinSize = Vector.load(data.levelMinSize);
-		levelMaxSize = Vector.load(data.levelMaxSize);
+		if (data.levelScreenSize != null) levelScreenSize = Vector.load(data.levelScreenSize);
+		if (data.levelDefaultSize != null) levelDefaultSize = Vector.load(data.levelDefaultSize);
+		if (data.levelMinSize != null) levelMinSize = Vector.load(data.levelMinSize);
+		if (data.levelMaxSize != null) levelMaxSize = Vector.load(data.levelMaxSize);
 		levelValues = ValueTemplate.loadList(data.levelValues);
 		defaultExportMode = Imports.string(data.defaultExportMode, ".json");
 		compactExport = data.compactExport;
@@ -157,6 +216,9 @@ class Project
 
 		// tilesets
 		if (data.tilesets != null) for (tileset in data.tilesets) tilesets.push(Tileset.load(this, tileset));
+
+		// autotiler
+		if (data.autotiler != null) for (def in data.autotiler) autotilerDefinitions.push(AutotilerDefinition.load(this, def));
 
 		//Layer Templates
 		for (layerData in data.layers)
@@ -195,6 +257,7 @@ class Project
 			anglesRadians: anglesRadians,
 			directoryDepth: directoryDepth,
 			layerGridDefaultSize: layerGridDefaultSize.save(),
+			levelScreenSize: levelScreenSize.save(),
 			levelDefaultSize: levelDefaultSize.save(),
 			levelMinSize: levelMinSize.save(),
 			levelMaxSize: levelMaxSize.save(),
@@ -206,7 +269,8 @@ class Project
 			entityTags: entities.tags,
 			layers: [for (layer in layers) layer.save()],
 			entities: [for (entity in entities.templates) entity.save()],
-			tilesets: [for (tileset in tilesets) tileset.save()],
+			tilesets: (tilesets.length > 0) ? [for (tileset in tilesets) tileset.save()] : null,
+			autotiler: (autotilerDefinitions.length > 0) ? [for (def in autotilerDefinitions) def.save(this)] : null
 		};
 
 		data = projectHooks.beforeSaveProject(this, data);
@@ -224,9 +288,9 @@ class Project
 		for (layer in layers) trace(layer);
 	}
 
-	public static function createDebugProject():Project
+	public static function createDebugProject(onReturn: Project -> Void): Void
 	{
-		return Imports.project(Path.join('.', 'debugProject', 'debug.ogmo'));
+		return Imports.project(Path.join('.', 'debugProject', 'debug.ogmo'), onReturn);
 	}
 }
 
@@ -241,6 +305,7 @@ typedef ProjectSaveFile =
 	anglesRadians:Bool,
 	directoryDepth:Int,
 	layerGridDefaultSize:{ x:Float, y:Float },
+	levelScreenSize:{ x:Float, y:Float },
 	levelDefaultSize:{ x:Float, y:Float },
 	levelMinSize:{ x:Float, y:Float },
 	levelMaxSize:{ x:Float, y:Float },
@@ -253,4 +318,5 @@ typedef ProjectSaveFile =
 	layers:Array<Dynamic>,
 	entities:Array<Dynamic>,
 	tilesets:Array<Dynamic>,
+	autotiler:Array<Dynamic>
 }

@@ -1,5 +1,6 @@
 package modules.tiles.tools;
 
+import level.data.Level;
 import modules.tiles.TileLayer.TileData;
 import level.editor.LayerEditor;
 import util.Random;
@@ -13,18 +14,20 @@ class TilePencilTool extends TileTool
 	public var lastRect:Rectangle = null;
 	public var random:Random = new Random();
 	
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (!drawing)
 		{
-			EDITOR.overlay.setAlpha(0.5);
+			var offset = level.data.offset;
+
+			EDITOR.overlay.setAlpha(0.75);
 			var at = layer.gridToLevel(prevPos);
 
 			if (OGMO.ctrl)
 			{
 				var tile = random.peekChoice2D(layerEditor.brush);
 				if (!tile.isEmptyTile() && layer.insideGrid(prevPos))
-					EDITOR.overlay.drawTile(at.x, at.y, layer.tileset, tile);
+					EDITOR.overlay.drawTile(at.x + offset.x, at.y + offset.y, layer.tileset, tile);
 			}
 			else
 			{
@@ -37,7 +40,7 @@ class TilePencilTool extends TileTool
 						{
 							var cur = new Vector(at.x + x * layer.template.gridSize.x, at.y + y * layer.template.gridSize.y);
 							if (layer.insideGrid(new Vector(prevPos.x + x, prevPos.y + y)))
-								EDITOR.overlay.drawTile(cur.x, cur.y, layer.tileset, tile);
+								EDITOR.overlay.drawTile(cur.x + offset.x, cur.y + offset.y, layer.tileset, tile);
 						}
 					}
 				}
@@ -109,7 +112,7 @@ class TilePencilTool extends TileTool
 			var py = pos.y.int();
 			if (!firstDraw)
 			{
-				EDITOR.level.store("draw cells");
+				EDITOR.currentLevel.store("draw cells");
 				firstDraw = true;
 			}
 

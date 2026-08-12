@@ -15,13 +15,14 @@ class IntegerValueTemplate extends ValueTemplate
 	}
 
 	public var defaults:Int = 0;
-	public var bounded:Bool = false;
+	public var boundedMin:Bool = false;
+	public var boundedMax:Bool = false;
 	public var min:Int = 0;
 	public var max:Int = 100;
 
 	override function getHashCode():String
 	{
-		return name + ":in" + (bounded ? (":" + min + ":" + max) : "");
+		return name + ":in" + (boundedMin ? (":" + min) : "") + (boundedMax ? (":" + max) : "");
 	}
 
 	override function getDefault():Int
@@ -32,9 +33,9 @@ class IntegerValueTemplate extends ValueTemplate
 	override function validate(val:Dynamic):Int
 	{
 		var number = Imports.integer(val, defaults);
-		if (bounded && number < min)
-			number = min
-		else if (bounded && number > max)
+		if (boundedMin && number < min)
+			number = min;
+		else if (boundedMax && number > max)
 			number = max;
 		return	number;
 	}
@@ -50,7 +51,9 @@ class IntegerValueTemplate extends ValueTemplate
 	{
 		super.load(data);
 		defaults = data.defaults;
-		bounded = data.bounded;
+		if (data.bounded != null) boundedMax = boundedMin = Imports.bool(data.bounded, false); // legacy
+		if (data.boundedMin != null) boundedMin = Imports.bool(data.boundedMin, false);
+		if (data.boundedMax != null) boundedMax = Imports.bool(data.boundedMax, false);
 		min = Imports.integer(data.min, 0);
 		max = Imports.integer(data.max, 100);
 	}
@@ -60,7 +63,8 @@ class IntegerValueTemplate extends ValueTemplate
 		var data:Dynamic = super.save();
 
 		data.defaults = defaults;
-		data.bounded = bounded;
+		data.boundedMin = boundedMin;
+		data.boundedMax = boundedMax;
 		data.min = min;
 		data.max = max;
 

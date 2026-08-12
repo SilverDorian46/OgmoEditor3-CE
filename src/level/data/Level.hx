@@ -25,23 +25,19 @@ class Level
 	public var unsavedID:Int;
 	public var stack:UndoStack;
 	public var unsavedChanges:Bool = false;
-	public var currentLayerID:Int = 0;
-	public var gridVisible:Bool = true;
-	public var camera:Matrix = new Matrix();
-	public var cameraInv:Matrix = new Matrix();
 	public var project:Project;
-	public var zoomRect:Rectangle = null;
-	public var zoomTimer:Int;
 
 	public var safeToClose(get, null):Bool;
 	public var displayName(get, null):String;
 	public var displayNameNoStar(get, null):String;
 	public var displayNameNoExtension(get, null):String;
+	public var displayNameNoExtNoLvl_(get, null):String;
 	public var managerPath(get, null):String;
 	public var currentLayer(get, null):Layer;
 	public var externallyDeleted(get, null):Bool;
 	public var externallyModified(get, null):Bool;
-	public var zoom(get, null):Float;
+	//public var zoom(get, null):Float;
+	public var shouldWarnSize(get, null):Bool;
 
 	public static function isUnsavedPath(path:String):Bool
 	{
@@ -68,7 +64,7 @@ class Level
 		}
 		else load(data);
 		
-		centerCamera();
+		//centerCamera();
 	}
 	
 	public function initLayers():Void
@@ -164,7 +160,7 @@ class Level
 
 			Export.level(this, path);
 
-			if (EDITOR.level == this)
+			if (EDITOR.currentLevel == this)
 				OGMO.updateWindowTitle();
 
 			if (refresh) 
@@ -209,7 +205,7 @@ class Level
 			path = file;
 			Export.level(this, file);
 
-			if (EDITOR.level == this) OGMO.updateWindowTitle();
+			if (EDITOR.currentLevel == this) OGMO.updateWindowTitle();
 			EDITOR.levelsPanel.refresh();
 
 			//Update project default export
@@ -229,6 +225,11 @@ class Level
 		HELPERS
 	*/
 
+	public function getLayer(layerID: Int): Layer
+	{
+		return layers[layerID];
+	}
+
 	public function getLayerByExportID(exportID:String): Layer
 	{
 		for (layer in layers) if (layer.template.exportID == exportID) return layer;
@@ -247,6 +248,11 @@ class Level
 	public function store(description:String):Void
 	{
 		stack.store(description);
+	}
+
+	public function storeLevelData(description:String):Void
+	{
+		stack.storeLevelData(description);
 	}
 
 	public function storeFull(freezeRight:Bool, freezeBottom:Bool, description:String):Void
@@ -270,94 +276,6 @@ class Level
 	public function shift(amount: Vector):Void
 	{
 		for (layer in layers) layer.shift(amount.clone());
-	}
-
-	/*
-		CAMERA
-	*/
-
-	public function updateCameraInverse():Void
-	{
-		camera.inverse(cameraInv);
-	}
-
-	public function centerCamera():Void
-	{
-		camera.setIdentity();
-		moveCamera(data.size.x / 2, data.size.y / 2);
-		updateCameraInverse();
-		EDITOR.dirty();
-
-		EDITOR.updateZoomReadout();
-		if (EDITOR.level == this) EDITOR.handles.refresh();
-	}
-
-	public function moveCamera(x:Float, y:Float):Void
-	{
-		if (x != 0 || y != 0)
-		{
-			camera.translate(-x, -y);
-			updateCameraInverse();
-			EDITOR.dirty();
-		}
-	}
-
-	public function zoomCamera(zoom:Float):Void
-	{
-		setZoomRect(zoom);
-
-		camera.scale(1 + .1 * zoom, 1 + .1 * zoom);
-		updateCameraInverse();
-		EDITOR.dirty();
-
-		EDITOR.updateZoomReadout();
-		EDITOR.handles.refresh();
-	}
-
-	public function setZoom(zoom:Float) {
-		camera.scale(zoom, zoom);
-		updateCameraInverse();
-		while (camera.a < 0.01 ) setZoom(0.01);
-		while (camera.a > 32 ) setZoom(-0.001);
-		EDITOR.dirty();
-
-		EDITOR.updateZoomReadout();
-		EDITOR.handles.refresh();
-	}
-
-	public function zoomCameraAt(zoom:Float, x:Float, y:Float):Void
-	{
-		setZoomRect(zoom);
-
-		moveCamera(x, y);
-		camera.scale(1 + .1 * zoom, 1 + .1 * zoom);
-		moveCamera(-x, -y);
-		updateCameraInverse();
-		while (camera.a < 0.01 ) zoomCameraAt(0.01, x, y);
-		while (camera.a > 32 ) zoomCameraAt(-0.001, x, y);
-		EDITOR.dirty();
-
-		EDITOR.updateZoomReadout();
-		EDITOR.handles.refresh();
-	}
-
-	public function setZoomRect(zoom:Float):Void
-	{
-		if (zoom < 0 && zoomRect == null)
-		{
-			var topLeft = EDITOR.getTopLeft();
-			var bottomRight = EDITOR.getBottomRight();
-			zoomRect = new Rectangle(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
-		}
-
-		if (zoomTimer != null) Browser.window.clearTimeout(zoomTimer);
-		zoomTimer = Browser.window.setTimeout(clearZoomRect, 500);
-	}
-
-	public function clearZoomRect():Void
-	{
-		if (EDITOR.level != null) EDITOR.level.zoomRect = null;
-		EDITOR.overlayDirty();
 	}
 
 	function get_safeToClose():Bool
@@ -393,6 +311,15 @@ class Level
 		return str;
 	}
 
+	function get_displayNameNoExtNoLvl_():String
+	{
+		var str:String = displayNameNoExtension;
+		if (StringTools.startsWith(str, "lvl_"))
+			str = str.substr(4);
+
+		return str;
+	}
+
 	function get_managerPath():String
 	{
 		if (path == null)
@@ -403,7 +330,7 @@ class Level
 
 	function get_currentLayer():Layer
 	{
-		return layers[currentLayerID];
+		return layers[EDITOR.currentLayerID];
 	}
 
 	function get_externallyDeleted():Bool
@@ -416,8 +343,8 @@ class Level
 		return path != null && FileSystem.exists(path) && FileSystem.loadString(path) != lastSavedData;
 	}
 
-	function get_zoom():Float
+	function get_shouldWarnSize():Bool
 	{
-		return camera.a;
+		return data.size.x < project.levelScreenSize.x || data.size.y < project.levelScreenSize.y;
 	}
 }

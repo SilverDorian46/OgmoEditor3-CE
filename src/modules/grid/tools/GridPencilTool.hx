@@ -66,12 +66,14 @@ class GridPencilTool extends GridTool
 		{
 			if (!firstDraw)
 			{
-				EDITOR.level.store("draw cells");
+				EDITOR.currentLevel.store("draw cells");
 				firstDraw = true;
 			}
 
 			layer.data[pos.x.int()][pos.y.int()] = drawBrush;
 			EDITOR.dirty();
+
+			layer.signalForAutotiler();
 		}
 	}
 

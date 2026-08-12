@@ -1,5 +1,6 @@
 package modules.tiles.tools;
 
+import level.data.Level;
 import modules.tiles.TileLayer.TileData;
 import util.Random;
 
@@ -13,18 +14,22 @@ class TileRectangleTool extends TileTool
 	public var rect:Rectangle = new Rectangle();
 	public var random:Random = new Random();
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (deleting)
 		{
+			var offset = level.data.offset;
+
 			var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 			var w = rect.width * layer.template.gridSize.x;
 			var h = rect.height * layer.template.gridSize.y;
 
-			EDITOR.overlay.drawRect(at.x, at.y, w, h, Color.red.x(0.5));
+			EDITOR.overlay.drawRect(at.x + offset.x, at.y + offset.y, w, h, Color.red.x(0.5));
 		}
 		else if (drawing)
 		{
+			var offset = level.data.offset;
+
 			var at = layer.gridToLevel(new Vector(rect.x, rect.y));
 			var random:Random = null;
 			if (OGMO.ctrl)
@@ -33,14 +38,14 @@ class TileRectangleTool extends TileTool
 				random.pushState();
 			}
 
-			EDITOR.overlay.setAlpha(0.5);
+			EDITOR.overlay.setAlpha(0.75);
 			for (x in 0...rect.width.int())
 			{
 				for (y in 0...rect.height.int())
 				{
 					var tile = brushAt(brush, rect.x.int() + x - start.x.int(), rect.y.int() + y - start.y.int(), random);
 					if (!tile.isEmptyTile())
-						EDITOR.overlay.drawTile(at.x + x * layer.template.gridSize.x, at.y + y * layer.template.gridSize.y, layer.tileset, tile);
+						EDITOR.overlay.drawTile(at.x + x * layer.template.gridSize.x + offset.x, at.y + y * layer.template.gridSize.y + offset.y, layer.tileset, tile);
 				}
 			}
 			EDITOR.overlay.setAlpha(1);
@@ -143,7 +148,7 @@ class TileRectangleTool extends TileTool
 			if (OGMO.ctrl)
 				random = this.random;
 
-			EDITOR.level.store("rectangle fill");
+			EDITOR.currentLevel.store("rectangle fill");
 			for (i in 0...rect.width.int())
 				for (j in 0...rect.height.int())
 					layer.data[rect.x.int() + i][rect.y.int() + j].copy(brushAt(brush, rect.x.int() + i - start.x.int(), rect.y.int() + j - start.y.int(), random));

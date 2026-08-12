@@ -1,5 +1,6 @@
 package modules.tiles.tools;
 
+import level.data.Level;
 import util.Random;
 import modules.tiles.TileLayer.TileData;
 
@@ -13,10 +14,12 @@ class TileLineTool extends TileTool
 	public var points:Array<Vector>;
 	public var random:Random = new Random();
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (deleting)
 		{
+			var offset = level.data.offset;
+
 			for (p in points)
 			{
 				if (layer.insideGrid(p))
@@ -24,12 +27,14 @@ class TileLineTool extends TileTool
 					var at = layer.gridToLevel(p);
 					var w = layer.template.gridSize.x;
 					var h = layer.template.gridSize.y;
-					EDITOR.overlay.drawRect(at.x, at.y, w, h, Color.red.x(0.5));
+					EDITOR.overlay.drawRect(at.x + offset.x, at.y + offset.y, w, h, Color.red.x(0.5));
 				}
 			}
 		}
 		else if (drawing)
 		{
+			var offset = level.data.offset;
+
 			var random:Random = null;
 			if (OGMO.ctrl)
 			{
@@ -37,13 +42,13 @@ class TileLineTool extends TileTool
 				random.pushState();
 			}
 			
-			EDITOR.overlay.setAlpha(0.5);
+			EDITOR.overlay.setAlpha(0.75);
 			for (p in points)
 			{
 				if (layer.insideGrid(p))
 				{
 					var at = layer.gridToLevel(p);
-					EDITOR.overlay.drawTile(at.x, at.y, layer.tileset, brushAt(brush, p.x.int() - start.x.int(), p.y.int() - start.y.int(), random));
+					EDITOR.overlay.drawTile(at.x + offset.x, at.y + offset.y, layer.tileset, brushAt(brush, p.x.int() - start.x.int(), p.y.int() - start.y.int(), random));
 				}
 			}
 			EDITOR.overlay.setAlpha(1);
@@ -142,7 +147,7 @@ class TileLineTool extends TileTool
 			var random:Random = null;
 			if (OGMO.ctrl)
 				random = this.random;
-			EDITOR.level.store("line fill");
+			EDITOR.currentLevel.store("line fill");
 
 			for (p in points)
 			{

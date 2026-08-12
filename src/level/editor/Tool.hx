@@ -1,5 +1,6 @@
 package level.editor;
 
+import level.data.Level;
 import util.Vector;
 
 class Tool
@@ -18,8 +19,8 @@ class Tool
 	public function onKeyRepeat(key:Int):Void {}
 
 	public function update():Void {}
-	public function draw():Void {}
-	public function drawOverlay():Void {}
+	public function draw(level:Level):Void {}
+	public function drawOverlay(level:Level):Void {}
 	public function activated():Void {}
 	public function deactivated():Void {}
 

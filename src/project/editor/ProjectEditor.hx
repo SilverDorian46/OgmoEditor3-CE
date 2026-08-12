@@ -101,44 +101,46 @@ class ProjectEditor
 
 		// reload the project
 		OGMO.project.unload();
-		OGMO.project = Imports.project(OGMO.project.path);
-
-		if (updateLevels)
+		Imports.project(OGMO.project.path, (proj) -> OGMO.setProject(proj, () ->
 		{
-			Popup.open('Save Project and Update Levels?', 'save', 'Save Project changes and Update all Level files in the Project?', ['Okay', 'Cancel'], (i) -> {
-				if (i != 0) return;
-				var level = new Level(OGMO.project);
-				for (path in OGMO.project.getAbsoluteLevelDirectories()) 
-				{
-					var walker = new Walker(path, { depthLimit: OGMO.project.directoryDepth });
-					walker.on("data", (item:Item) -> { 
-						if(haxe.io.Path.extension(item.path) == 'json' && FileSystem.exists(item.path)) 
-						{
-							var levelData = FileSystem.loadJSON(item.path);
-							if (levelData.ogmoVersion != null && levelData.layers != null)
+			if (updateLevels)
+			{
+				Popup.open('Save Project and Update Levels?', 'save', 'Save Project changes and Update all Level files in the Project?', ['Okay', 'Cancel'], (i) -> {
+					if (i != 0) return;
+					var level = new Level(OGMO.project);
+					for (path in OGMO.project.getAbsoluteLevelDirectories()) 
+					{
+						var walker = new Walker(path, { depthLimit: OGMO.project.directoryDepth });
+						walker.on("data", (item:Item) -> { 
+							if(haxe.io.Path.extension(item.path) == 'json' && FileSystem.exists(item.path)) 
 							{
-								level.load(levelData);
-								level.path = item.path;
-								level.doSave(false);
-							}
-						} 
-					});
-					walker.on('end', () -> {
-						// goto editor
-						EDITOR.levelManager.close(level);
-						EDITOR.onSetProject();
-						OGMO.gotoEditorPage();
-						walker.destroy();
-					});
-				}
-			});
-		}
-		else
-		{
-			// goto editor
-			EDITOR.onSetProject();
-			OGMO.gotoEditorPage();	
-		}
+								var levelData = FileSystem.loadJSON(item.path);
+								if (levelData.ogmoVersion != null && levelData.layers != null)
+								{
+									level.load(levelData);
+									level.path = item.path;
+									level.doSave(false);
+								}
+							} 
+						});
+						walker.on('end', () -> {
+							// goto editor
+							EDITOR.levelManager.close(level);
+							EDITOR.onSetProject(() ->
+							{
+								OGMO.gotoEditorPage();
+								walker.destroy();
+							});
+						});
+					}
+				});
+			}
+			else
+			{
+				// goto editor
+				EDITOR.onSetProject(OGMO.gotoEditorPage);
+			}
+		}, true));
 	}
 
 	public function validate():Bool {
@@ -157,16 +159,13 @@ class ProjectEditor
 		
 		if (FileSystem.exists(OGMO.project.path)) 
 		{
-			// reload the project
-			OGMO.project = Imports.project(OGMO.project.path);
-				// goto editor
-			EDITOR.onSetProject();
-			OGMO.gotoEditorPage();
+			// reload the project, and goto editor
+			Imports.project(OGMO.project.path, (proj) -> OGMO.setProject(proj, () -> EDITOR.onSetProject(OGMO.gotoEditorPage), true));
 		} else 
 		{
 			// if project does not exist, goto start page
 			OGMO.gotoStartPage();
-			OGMO.project = null;
+			OGMO.unsetProject();
 		}
 	}
 

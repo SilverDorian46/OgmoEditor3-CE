@@ -11,10 +11,13 @@ class DecalLayer extends Layer
 	override function save():Dynamic
 	{
 		var data = super.save();
+
+		var decalTemplate = (cast template : DecalLayerTemplate);
+
 		data._contents = "decals";
 		data.decals = [];
-		for (decal in decals) data.decals.push(decal.save((cast template : DecalLayerTemplate).scaleable, (cast template : DecalLayerTemplate).rotatable));
-		data.folder = (cast template : DecalLayerTemplate).folder;
+		for (decal in decals) data.decals.push(decal.save(decalTemplate));
+		data.folder = decalTemplate.folder;
 
 		return data;
 	}
@@ -23,6 +26,7 @@ class DecalLayer extends Layer
 	{
 		super.load(data);
 
+		var decalTemplate = (cast template : DecalLayerTemplate);
 		var decals = Imports.contentsArray(data, "decals");
 
 		for (decal in decals)
@@ -30,22 +34,25 @@ class DecalLayer extends Layer
 			
 			var position = Imports.vector(decal, "x", "y");
 			var path = haxe.io.Path.normalize(decal.texture);
-			var relative = Path.join((cast template : DecalLayerTemplate).folder, path);
-			var texture:Texture = null;
+			var relative = Path.normalize(Path.join(decalTemplate.folder, path));
+			//var texture:Texture = null;
 			var origin = Imports.vector(decal, "originX", "originY", new Vector(0.5, 0.5));
 			var scale = Imports.vector(decal, "scaleX", "scaleY", new Vector(1, 1));
 			var rotation = Imports.float(decal.rotation, 0);
+			var color = Imports.color(decal.color, decalTemplate.includeAlpha, Color.white);
 
-			var values = Imports.values(decal, (cast template:DecalLayerTemplate).values);
+			var values = Imports.values(decal, decalTemplate.values);
 
-			for (tex in (cast template : DecalLayerTemplate).textures)
+			/*for (tex in decalTemplate.textures)
 				if (tex.path == relative)
 				{
 					texture	= tex;
 					break;
-				}
+				}*/
 
-			this.decals.push(new Decal(position, path, texture, origin, scale, rotation, values));
+			var texture = decalTemplate.textures.get(relative);
+
+			this.decals.push(new Decal(position, path, texture, origin, scale, rotation, color, values));
 		}
 	}
 

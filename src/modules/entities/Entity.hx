@@ -1,5 +1,9 @@
 package modules.entities;
 
+import level.data.Level;
+import rendering.Atlas;
+import haxe.ds.Either;
+import rendering.Subtexture;
 import io.Imports;
 import level.data.Value;
 import project.data.value.TextValueTemplate;
@@ -33,7 +37,11 @@ class Entity
 	private var _points:Array<Vector> = [];
 	private var _sizeAnchor:Vector;
 	private var _rotationAnchor:Float;
-	private var _texture:Null<Texture>;
+	//private var _texture:Null<Texture>;
+	private var _texture:Null<Subtexture>;
+
+	private var handler: EntityHandlerStruct;
+
 	private static var hoverColor:Color = new Color(1, 1, 1, 0.5);
 
 	public static function create(id:Int, template:EntityTemplate, pos:Vector):Entity
@@ -50,9 +58,13 @@ class Entity
 		e.flippedY = false;
 		e.color = template.color;
 		e.nodes = [];
+		if (template.nodeMinimum > 0) for (i in 0...template.nodeMinimum)
+			e.nodes.push(new Vector(pos.x + 16 * (i + 1), pos.y));
 		e._texture = template.texture;
 		e.values = [];
 		for (value in template.values) e.values.push(new Value(value));
+
+		e.handler = OGMO.project.projectHooks.getEntityHandler(template);
 
 		e.updateMatrix();
 		return e;
@@ -72,9 +84,11 @@ class Entity
 		e.rotation = Imports.float(data.rotation, 0) * (OGMO.project.anglesRadians ? Calc.RTD : 1);
 		e.flippedX = Imports.bool(data.flippedX, false);
 		e.flippedY = Imports.bool(data.flippedY, false);
-		e.color = Imports.color(data.color, false, template.color);
+		e.color = Imports.color(data.color, template.includeAlpha, template.color);
 		e.nodes = Imports.nodes(data);
 		e.values = Imports.values(data, template.values);
+
+		e.handler = OGMO.project.projectHooks.getEntityHandler(template);
 
 		e._texture = template.texture;
 
@@ -82,7 +96,7 @@ class Entity
 		return e;
 	}
 
-	public function new() {}
+	inline function new() {}
 
 	public function save():Dynamic
 	{
@@ -97,7 +111,7 @@ class Entity
 		if (template.rotatable) data.rotation = OGMO.project.anglesRadians ? rotation * Calc.DTR : rotation;
 		if (template.canFlipX) data.flippedX = flippedX;
 		if (template.canFlipY) data.flippedY = flippedY;
-		if (template.canSetColor) data.color = Export.color(color, true);
+		if (template.canSetColor) data.color = Export.color(color, template.includeAlpha, template.includeHashtag);
 		Export.nodes(data, nodes);
 		Export.values(data, values);
 
@@ -116,10 +130,12 @@ class Entity
 		e.rotation = rotation;
 		e.flippedX = flippedX;
 		e.flippedY = flippedY;
-		e.color = color;
+		e.color = color.clone();
 		e.nodes = [for (node in nodes) node.clone()];
 		e._texture = _texture;
 		e.values = [for (value in values) value.clone()];
+
+		e.handler = OGMO.project.projectHooks.getEntityHandler(template);
 
 		e.updateMatrix();
 		return e;
@@ -234,68 +250,129 @@ class Entity
 		DRAWING
 	*/
 
-	public function draw()
+	public inline function draw(level: Level) drawOffset(level.data.offset.x, level.data.offset.y);
+
+	public function drawOffset(offx: Float, offy: Float)
 	{
-		if (_texture != null)
+		var hTexture: Subtexture = null;
+		var hTextures: Array<Subtexture> = null;
+		var hNodeTexture: Subtexture = null;
+		if (handler != null)
+		{
+			var atlas = OGMO.project.atlas;
+			hTexture = textureFromHandler(handler.texture, atlas);
+			hTextures = texturesFromHandler(handler.textures, atlas);
+			hNodeTexture = textureFromHandler(handler.nodeTexture, atlas);
+		}
+
+		function drawTexture(subtex: Subtexture, pos: Vector, color: Color)
 		{
 			var orig = origin.clone();
 			if (flippedX) orig.x -= size.x;
 			if (flippedY) orig.y -= size.y;
-			orig.rotate(Math.sin(rotation * Math.PI / 180), Math.cos(rotation * Math.PI / 180));
-			EDITOR.draw.drawTexture(position.x - orig.x, position.y - orig.y, _texture, null, size.clone().div(template.size).mult(new Vector(flippedX ? -1 : 1, flippedY ? -1 : 1)), rotation * Calc.DTR);
+			orig.x = (orig.x / size.x) * subtex.width;
+			orig.y = (orig.y / size.y) * subtex.height;
+			var rot = rotation * Calc.DTR;
+			orig.rotate(Math.sin(rot), Math.cos(rot));
+			EDITOR.draw.drawSubtexture(offx + pos.x - orig.x, offy + pos.y - orig.y, subtex, null, new Vector(flippedX ? -1 : 1, flippedY ? -1 : 1), rot, null, null, null, null, color);
+		}
+
+		if (hTextures != null && hTextures.length > 0) for (tex in hTextures) drawTexture(tex, position, Color.white);
+		else if (hTexture != null) drawTexture(hTexture, position, Color.white);
+		else if (_texture != null)
+		{
+			var orig = origin.clone();
+			if (flippedX) orig.x -= size.x;
+			if (flippedY) orig.y -= size.y;
+			var rot = rotation * Calc.DTR;
+			orig.rotate(Math.sin(rot), Math.cos(rot));
+			EDITOR.draw.drawSubtexture(offx + position.x - orig.x, offy + position.y - orig.y, _texture, null, size.clone().div(template.size).mult(new Vector(flippedX ? -1 : 1, flippedY ? -1 : 1)), rot);
 		}
 		else 
 		{
-			EDITOR.draw.drawTris(_points, position, color);
+			EDITOR.draw.drawTris(_points, new Vector(offx + position.x, offy + position.y), color);
 		}
 
 		//Draw Node Ghosts
-		if (nodes.length > 0 && template.nodeGhost)
+		if (nodes.length > 0)
 		{
-			var c = color.x(0.5);
-			for (node in nodes)
+			var handled = false;
+			if (hNodeTexture != null)
 			{
-				if (_texture != null)
+				handled = true;
+				for (node in nodes) drawTexture(hNodeTexture, node, Color.white);
+			}
+
+			if (!handled)
+			{
+				if (template.nodePoint)
 				{
-					var orig = origin.clone();
-					if (flippedX) orig.x -= size.x;
-					if (flippedY) orig.y -= size.y;
-					orig.rotate(Math.sin(rotation * Math.PI / 180), Math.cos(rotation * Math.PI / 180));
-					var previousAlpha = EDITOR.draw.getAlpha();
-					EDITOR.draw.setAlpha(previousAlpha * .5);
-					EDITOR.draw.drawTexture(node.x - orig.x, node.y - orig.y, _texture, null, size.clone().div(template.size).mult(new Vector(flippedX ? -1 : 1, flippedY ? -1 : 1)), rotation * Math.PI / 180);
-					EDITOR.draw.setAlpha(previousAlpha);
+					var nodeSize = template.nodePointSize;
+					for (node in nodes)
+					{
+						EDITOR.draw.drawRect(offx + node.x - (nodeSize.x * 0.5), offy + node.y - (nodeSize.y * 0.5), nodeSize.x, nodeSize.y, color);
+					}
 				}
-				else
+
+				if (template.nodeGhost)
 				{
-					EDITOR.draw.drawTris(_points, node, c);
+					var c = color.x(0.5);
+					var texture_c = Color.white.x(.75);
+					for (node in nodes)
+					{
+						if (hTextures != null && hTextures.length > 0) for (tex in hTextures) drawTexture(tex, node, texture_c);
+						else if (hTexture != null) drawTexture(hTexture, node, texture_c);
+						else if (_texture != null)
+						{
+							var orig = origin.clone();
+							if (flippedX) orig.x -= size.x;
+							if (flippedY) orig.y -= size.y;
+							var rot = rotation * Calc.DTR;
+							orig.rotate(Math.sin(rot), Math.cos(rot));
+							EDITOR.draw.drawSubtexture(offx + node.x - orig.x, offy + node.y - orig.y, _texture, null, size.clone().div(template.size).mult(new Vector(flippedX ? -1 : 1, flippedY ? -1 : 1)), rot, null, null, null, null, texture_c);
+						}
+						else
+						{
+							EDITOR.draw.drawTris(_points, new Vector(offx + node.x, offy + node.y), c);
+						}
+					}
 				}
 			}
 		}
 	}
 
-	public function drawHoveredBox(?position:Vector)
+	public function drawHoveredBox(level: Level, ?position:Vector)
 	{
 		var pos = position == null ? this.position : position;
-		var corners = getCorners(pos, 8 / EDITOR.level.zoom);
+		var corners = getCorners(pos.clone().add(level.data.offset), 8 / EDITOR.zoom);
 		EDITOR.draw.drawTri(corners[0], corners[1], corners[2], Entity.hoverColor);
 		EDITOR.draw.drawTri(corners[1], corners[2], corners[3], Entity.hoverColor);
 	}
 
-	public function drawHoveredNodeBox(?position:Vector)
+	public function drawHoveredNodeBox(level: Level, nodePos:Vector)
 	{
-		var col = Entity.hoverColor.x(0.5);
+		var offset = level.data.offset;
 
-		var pos = position == null ? this.position : position;
-		var corners = getCorners(pos, 8 / EDITOR.level.zoom);
-		EDITOR.draw.drawTri(corners[0], corners[1], corners[2], col);
-		EDITOR.draw.drawTri(corners[1], corners[2], corners[3], col);
+		if (template.nodePoint)
+		{
+			var nodeSize = template.nodePointSize;
+			var pad = 8 / EDITOR.zoom;
+			EDITOR.draw.drawRect((nodePos.x + offset.x) - pad - (nodeSize.x * 0.5), (nodePos.y + offset.y) - pad - (nodeSize.y * 0.5), nodeSize.x + (pad * 2), nodeSize.y + (pad * 2), Entity.hoverColor);
+		}
+		else
+		{
+			var col = Entity.hoverColor.x(0.5);
+
+			var corners = getCorners(nodePos.clone().add(offset), 8 / EDITOR.zoom);
+			EDITOR.draw.drawTri(corners[0], corners[1], corners[2], col);
+			EDITOR.draw.drawTri(corners[1], corners[2], corners[3], col);
+		}
 	}
 
-	public function drawSelectionBox(?position:Vector)
+	public function drawSelectionBox(level: Level, ?position:Vector)
 	{
 		var pos = position == null ? this.position : position;
-		var corners = getCorners(pos, 8 / EDITOR.level.zoom);
+		var corners = getCorners(pos.clone().add(level.data.offset), 8 / EDITOR.zoom);
 		EDITOR.overlay.drawLine(corners[0], corners[1], Color.green);
 		EDITOR.overlay.drawLine(corners[1], corners[3], Color.green);
 		EDITOR.overlay.drawLine(corners[2], corners[3], Color.green);
@@ -308,7 +385,13 @@ class Entity
 
 	public function getNodeAt(pos:Vector):Int
 	{
-		for (i in 0...nodes.length)
+		if (template.nodePoint) for (i in 0...nodes.length)
+		{
+			var nodePos = nodes[i];
+			if (checkNodePoint(pos, nodePos))
+				return i;
+		}
+		else for (i in 0...nodes.length)
 		{
 			var nodePos = nodes[i];
 			if (checkPoint(pos, nodePos))
@@ -322,6 +405,12 @@ class Entity
 	function get_canAddNode():Bool
 	{
 		return template.hasNodes && (template.nodeLimit <= 0 || nodes.length < template.nodeLimit);
+	}
+
+	public var canRemoveNode(get, never):Bool;
+	function get_canRemoveNode():Bool
+	{
+		return nodes.length > template.nodeMinimum;
 	}
 
 	public function addNodeAt(pos:Vector):Vector
@@ -342,28 +431,32 @@ class Entity
 		return template.nodeDisplay != NodeDisplayModes.NONE && nodes.length > 0;
 	}
 
-	public function drawNodeLines()
+	public inline function drawNodeLines(level: Level) drawNodeLinesOffset(level.data.offset.x, level.data.offset.y);
+
+	public function drawNodeLinesOffset(offx: Float, offy: Float)
 	{
 		switch (template.nodeDisplay)
 		{
 			case NodeDisplayModes.PATH:
+				var zoom = EDITOR.camera.a;
 				var prev:Vector = position;
 				for (node in nodes)
 				{
-					EDITOR.draw.drawLine(prev, node, Color.white);
+					EDITOR.draw.drawLineQuads(new Vector(offx + prev.x, offy + prev.y), new Vector(offx + node.x, offy + node.y), Color.white, zoom);
 					prev = node;
 				}
 			case NodeDisplayModes.CIRCUIT:
+				var zoom = EDITOR.camera.a;
 				var prev:Vector = position;
 				for (node in nodes)
 				{
-					EDITOR.draw.drawLine(prev, node, Color.white);
+					EDITOR.draw.drawLineQuads(new Vector(offx + prev.x, offy + prev.y), new Vector(offx + node.x, offy + node.y), Color.white, zoom);
 					prev = node;
 				}
 
-				if (nodes.length > 1) EDITOR.draw.drawLine(prev, position, Color.white);
+				if (nodes.length > 1) EDITOR.draw.drawLineQuads(new Vector(offx + prev.x, offy + prev.y), new Vector(offx + position.x, offy + position.y), Color.white, zoom);
 			case NodeDisplayModes.FAN:
-				for (node in nodes) EDITOR.draw.drawLine(position, node, Color.white);
+				for (node in nodes) EDITOR.draw.drawLineQuads(new Vector(offx + position.x, offy + position.y), new Vector(offx + node.x, offy + node.y), Color.white, EDITOR.camera.a);
 			default:
 		}
 	}
@@ -413,6 +506,18 @@ class Entity
 		return (p.x >= -valX && p.x < valX && p.y >= -valY && p.y < valY);
 	}
 
+	public function checkNodePoint(pos: Vector, nodePos: Vector): Bool
+	{
+		var p = pos.clone();
+		p.x -= nodePos.x;
+		p.y -= nodePos.y;
+
+		var valX = 2 + (template.nodePointSize.x * 0.5);
+		var valY = 2 + (template.nodePointSize.y * 0.5);
+
+		return (p.x >= -valX && p.x < valX && p.y >= -valY && p.y < valY);
+	}
+
 	public function checkRect(rect:Rectangle, ?ownPos:Vector):Bool
 	{
 		//constraints: rect is AABB, this Entity's hitbox is a potentially-rotated rectangle
@@ -439,4 +544,58 @@ class Entity
 
 		return false;
 	}
+
+	/*
+	    SEARCH
+	*/
+
+	@:keep
+	public function getValue(name: String): Null<Dynamic>
+	{
+		for (value in values) if (value.template.name == name) return value.value;
+		return null;
+	}
+
+	/*
+	    ENTITY HANDLER
+	*/
+
+	// string or string-returning function
+	function textureFromHandler(texture: Dynamic, atlas: Atlas): Subtexture
+	{
+		if (texture == null) return null;
+		return switch (js.Lib.typeof(texture))
+		{
+			case "string": atlas.get(texture);
+			case "function": atlas.get(texture(this));
+			default: null;
+		}
+	}
+
+	// array of strings or array-of-strings-returning function
+	function texturesFromHandler(textures: Dynamic, atlas: Atlas): Array<Subtexture>
+	{
+		if (textures == null) return null;
+		var strs: Array<Dynamic> = switch (js.Lib.typeof(textures))
+		{
+			case "object": textures;
+			case "function": textures(this);
+			default: null;
+		}
+		if (strs == null) return null;
+		trace(strs);
+		var result = [];
+		for (str in strs) if (js.Lib.typeof(str) == "string")
+		{
+			var tex = atlas.get(str);
+			if (tex != null) result.push(tex);
+		}
+		return result;
+	}
+}
+
+typedef EntityHandlerStruct = {
+	var texture: Dynamic;
+	var textures: Dynamic;
+	var nodeTexture: Dynamic;
 }

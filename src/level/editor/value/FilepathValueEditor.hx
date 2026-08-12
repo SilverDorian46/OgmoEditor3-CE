@@ -52,7 +52,7 @@ class FilepathValueEditor extends ValueEditor
 			var nextPathValue = nextValue.path;
 			if (lastPathValue != nextPathValue || conflictPath)
 			{
-				EDITOR.level.store("Changed " + template.name + " Path from '" + lastPathValue + "' to '" + nextPathValue + "'");
+				EDITOR.currentLevel.store("Changed " + template.name + " Path from '" + lastPathValue + "' to '" + nextPathValue + "'");
 				for (i in 0...values.length)
 				{
 					var data = FilepathData.parseString(values[i].value);
@@ -75,7 +75,7 @@ class FilepathValueEditor extends ValueEditor
 				var nextPathValue:String = null;
 				var from = nextBaseValue == RelativeTo.PROJECT ? "level" : "project";
 				var to = nextBaseValue != RelativeTo.PROJECT ? "level" : "project";
-				EDITOR.level.store("Changed " + template.name + " Reference from '" + from + "' to '" + to + "'");
+				EDITOR.currentLevel.store("Changed " + template.name + " Reference from '" + from + "' to '" + to + "'");
 				for (i in 0...values.length)
 				{
 					var data = FilepathData.parseString(values[i].value);

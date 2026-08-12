@@ -137,8 +137,12 @@ class FilepathData
 
 	public static function getLevelDirectoryPath()
 		{
-			if (EDITOR != null && EDITOR.level != null && validPath(EDITOR.level.path))
-				return Path.directory(EDITOR.level.path);
+			if (EDITOR != null)
+			{
+				var level = EDITOR.currentLevel;
+				if (level != null && validPath(level.path))
+					return Path.directory(level.path);
+			}
 			return null;
 		}
 

@@ -37,25 +37,44 @@ class Color
 		return result;
 	}
 
+	public function lerp(to:Color, amount:Float, ?result:Color):Color
+	{
+		if (result == null) result = new Color();
+
+		result.r = Calc.lerp(r, to.r, amount);
+		result.g = Calc.lerp(g, to.g, amount);
+		result.b = Calc.lerp(b, to.b, amount);
+		result.a = Calc.lerp(a, to.a, amount);
+
+		return result;
+	}
+
 	public function rgbaString():String
 	{
 		return "rgba(" + Math.floor(r * 255) + "," + Math.floor(g * 255) + "," + Math.floor(b * 255) + "," + a + ")";
 	}
 
-	public function toHex():String
+	public function toHex(includeHashtag = true):String
 	{
-		return untyped ("#" + ((1 << 24) + (this.r * 255 << 16) + (this.g * 255 << 8) + this.b * 255).toString(16).slice(1)).substr(0, 7);
+		var r = Math.floor(r * 255);
+		var g = Math.floor(g * 255);
+		var b = Math.floor(b * 255);
+		var result:String = untyped ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).substr(1);
+		return includeHashtag ? "#" + result : result;
+
+		//return untyped ("#" + ((1 << 24) + (this.r * 255 << 16) + (this.g * 255 << 8) + this.b * 255).toString(16).slice(1)).substr(0, 7);
 	}
 
 	// TODO - what does the output of this look like? -01010111
 	// updated - may have fixed it? - austin
-	public function toHexAlpha():String
+	public function toHexAlpha(includeHashtag = true):String
 	{
 		var r = Math.floor(r * 255);
 		var g = Math.floor(g * 255);
 		var b = Math.floor(b * 255);
 		var a = Math.floor(a * 255);
-		return untyped "#" + (256 + r).toString(16).substr(1) + ((1 << 24) + (g << 16) | (b << 8) | a).toString(16).substr(1);
+		var result:String = untyped (256 + r).toString(16).substr(1) + ((1 << 24) | (g << 16) | (b << 8) | a).toString(16).substr(1);
+		return includeHashtag ? "#" + result : result;
 	}
 
 	public function toHSV():Array<Float>

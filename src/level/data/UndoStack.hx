@@ -32,7 +32,7 @@ class UndoStack
 	{
 		description = "<span class='layer'>" + level.currentLayer.template.name + ":</span> " + description;
 
-		var state = fetchLayer(level.currentLayerID, description);
+		var state = fetchLayer(EDITOR.currentLayerID, description);
 		undoStates.push(state);
 		redoStates.resize(0);
 
@@ -87,15 +87,15 @@ class UndoStack
 			if (state.freezeRight)
 			{
 				var move:Float = level.data.size.x - oldSize.x;
-				move *= level.camera.a;
-				level.moveCamera(move, 0);
+				move *= EDITOR.camera.a;
+				EDITOR.moveCamera(move, 0);
 			}
 
 			if (state.freezeBottom)
 			{
 				var move:Float = level.data.size.y - oldSize.y;
-				move *= level.camera.d;
-				level.moveCamera(0, move);
+				move *= EDITOR.camera.d;
+				EDITOR.moveCamera(0, move);
 			}
 
 			if (!level.unsavedChanges)
@@ -131,15 +131,15 @@ class UndoStack
 			if (state.freezeRight)
 			{
 				var move:Float = level.data.size.x - oldSize.x;
-				move *= level.camera.a;
-				level.moveCamera(move, 0);
+				move *= EDITOR.camera.a;
+				EDITOR.moveCamera(move, 0);
 			}
 
 			if (state.freezeBottom)
 			{
 				var move:Float = level.data.size.y - oldSize.y;
-				move *= level.camera.d;
-				level.moveCamera(0, move);
+				move *= EDITOR.camera.d;
+				EDITOR.moveCamera(0, move);
 			}
 
 			if (!level.unsavedChanges)
@@ -215,7 +215,7 @@ class UndoStack
 		for (layer in state.layers)
 		{
 			level.layers[layer.id] = layer;
-			EDITOR.layerEditors[layer.id].afterUndoRedo();
+			EDITOR.layerEditors[layer.id].afterUndoRedo(level);
 		}
 
 		if (state.level != null)

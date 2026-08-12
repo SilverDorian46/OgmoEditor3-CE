@@ -1,5 +1,7 @@
 package modules.entities;
 
+import level.data.Level;
+import rendering.Subtexture;
 import js.node.Path;
 import util.Matrix;
 import util.Vector;
@@ -30,13 +32,19 @@ class EntityTemplate
 	public var canFlipX:Bool = false;
 	public var canFlipY:Bool = false;
 	public var canSetColor:Bool = false;
+	public var includeAlpha:Bool = false;
+	public var includeHashtag:Bool = false;
 	public var hasNodes:Bool = false;
+	public var nodeMinimum:Int = -1;
 	public var nodeLimit:Int = -1;
 	public var nodeDisplay:NodeDisplayModes = NodeDisplayModes.PATH;
 	public var nodeGhost:Bool = true;
+	public var nodePoint:Bool = false;
+	public var nodePointSize:Vector = new Vector(4, 4);
 	public var values:Array<ValueTemplate> = [];
 	public var tags:Array<String> = [];
-	public var texture:Null<Texture>;
+	//public var texture:Null<Texture>;
+	public var texture:Null<Subtexture>;
 	public var texturePath:String;
 
 	//Not Exported
@@ -45,11 +53,14 @@ class EntityTemplate
 
 	inline function new() {}
 
-	public function drawPreview(at:Vector)
+	public function drawPreview(level:Level, at:Vector)
 	{
+		at = EDITOR.levelToGlobal(at, level);
+
 		if (texture != null)
 		{
-			EDITOR.overlay.drawTexture(at.x, at.y, texture, origin, null);
+			//EDITOR.overlay.drawTexture(at.x, at.y, texture, origin, null);
+			EDITOR.overlay.drawSubtexture(at.x, at.y, texture, origin);
 		}
 		else 
 		{
@@ -74,14 +85,14 @@ class EntityTemplate
 
 		next.name = from.name + "_copy";
 		next.limit = from.limit;
-		next.size = from.size;
-		next.origin = from.origin;
+		next.size = from.size.clone();
+		next.origin = from.origin.clone();
 		next.originAnchored = from.originAnchored;
 		next.shape = from.shape.clone();
-		next.color = from.color;
+		next.color = from.color.clone();
 		next.tileX = from.tileX;
 		next.tileY = from.tileY;
-		next.tileSize = from.tileSize;
+		next.tileSize = from.tileSize.clone();
 		next.resizeableX = from.resizeableX;
 		next.resizeableY = from.resizeableY;
 		next.rotatable = from.rotatable;
@@ -89,11 +100,16 @@ class EntityTemplate
 		next.canFlipX = from.canFlipX;
 		next.canFlipY = from.canFlipY;
 		next.canSetColor = from.canSetColor;
+		next.includeAlpha = from.includeAlpha;
+		next.includeHashtag = from.includeHashtag;
 		next.hasNodes = from.hasNodes;
+		next.nodeMinimum = from.nodeMinimum;
 		next.nodeLimit = from.nodeLimit;
 		next.nodeDisplay = from.nodeDisplay;
 		next.nodeGhost = from.nodeGhost;
-		next.tags = from.tags;
+		next.nodePoint = from.nodePoint;
+		next.nodePointSize = from.nodePointSize.clone();
+		next.tags = from.tags.copy();
 		next.texture = from.texture;
 		next.texturePath = from.texturePath;
 
@@ -122,10 +138,15 @@ class EntityTemplate
 		e.canFlipX = data.canFlipX;
 		e.canFlipY = data.canFlipY;
 		e.canSetColor = data.canSetColor;
+		e.includeAlpha = data.includeAlpha;
+		e.includeHashtag = data.includeHashtag;
 		e.hasNodes = data.hasNodes;
+		e.nodeMinimum = data.nodeMinimum;
 		e.nodeLimit = data.nodeLimit;
 		e.nodeDisplay = data.nodeDisplay;
 		e.nodeGhost = data.nodeGhost;
+		if (data.nodePoint != null) e.nodePoint = data.nodePoint;
+		if (data.nodePointSize != null) e.nodePointSize = Vector.load(data.nodePointSize);
 		e.tags = data.tags;
 		e.values  = ValueTemplate.loadList(data.values);
 
@@ -140,7 +161,7 @@ class EntityTemplate
 		}
 		// If that didnt work, try to load the base64'd version
 		if (e.texture == null && data.textureImage != null)
-			e.texture = Texture.fromString(data.textureImage);
+			e.texture = new Subtexture(Texture.fromString(data.textureImage));
 
 		return e;
 	}
@@ -166,10 +187,15 @@ class EntityTemplate
 			canFlipX: canFlipX,
 			canFlipY: canFlipY,
 			canSetColor: canSetColor,
+			includeAlpha: includeAlpha,
+			includeHashtag: includeHashtag,
 			hasNodes: hasNodes,
+			nodeMinimum: nodeMinimum,
 			nodeLimit: nodeLimit,
 			nodeDisplay: nodeDisplay,
 			nodeGhost: nodeGhost,
+			nodePoint: nodePoint,
+			nodePointSize: nodePointSize.save(),
 			tags: tags,
 			values: ValueTemplate.saveList(values)
 		}
@@ -178,7 +204,8 @@ class EntityTemplate
 		{
 			if (texturePath != null)
 				e.texture = texturePath;
-			e.textureImage = texture.image.src;
+			//e.textureImage = texture.image.src;
+			e.textureImage = texture.extractImageDataURL();
 		}
 
 		return e;
@@ -192,7 +219,8 @@ class EntityTemplate
 
 	public function getIcon():String
 	{
-		if (texture != null) return texture.image.src;
+		//if (texture != null) return texture.image.src;
+		if (texture != null) return texture.extractImageDataURL();
 		if (_icon == null) refreshIcon();
 		return _icon;
 	}
@@ -207,7 +235,8 @@ class EntityTemplate
 		else
 		{
 			texturePath = FileSystem.normalize(Path.relative(Path.dirname(project.path), absolutePath));
-			texture = Texture.fromFile(absolutePath);
+			//texture = Texture.fromFile(absolutePath);
+			texture = project.atlas.getWithFullPath(absolutePath);
 		}
 	}
 

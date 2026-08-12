@@ -1,43 +1,51 @@
 package modules.decals;
 
+import level.data.Level;
+import rendering.Subtexture;
 import level.data.Value;
 import rendering.Texture;
 
 class Decal
 {
+	public static var rotationSnap: Float = Math.PI / 180;
+
 	public var position:Vector;
 	public var scale:Vector;
 	public var origin:Vector;
 	public var rotation:Float;
-	public var texture:Texture;
+	public var color:Color;
+	//public var texture:Texture;
+	public var texture:Subtexture;
 	public var path:String;
 	public var width(get, never):Int;
 	public var height(get, never):Int;
 	public var values:Array<Value>;
 
-	public function new(position:Vector, path:String, texture:Texture, ?origin:Vector, ?scale:Vector, ?rotation:Float, ?values:Array<Value>)
+	public function new(position:Vector, path:String, texture:Subtexture, ?origin:Vector, ?scale:Vector, ?rotation:Float, ?color:Color, ?values:Array<Value>)
 	{
 		this.position = position.clone();
 		this.texture = texture;
 		this.path = path;
 		this.scale = scale == null ? new Vector(1, 1) : scale.clone();
 		this.rotation = rotation == null ? 0 : OGMO.project.anglesRadians ? rotation : rotation * Calc.DTR;
+		this.color = color == null ? Color.white : color;
 		this.values = values == null ? [] : values;
 		this.origin = origin == null ? new Vector(0.5, 0.5) : origin.clone();
 	}
 
-	public function save(scaleable:Bool, rotatable:Bool):Dynamic
+	public function save(template:DecalLayerTemplate):Dynamic
 	{
 		var data:Dynamic = {};
 		data._name = "decal";
 		data.x = position.x;
 		data.y = position.y;
-		if (scaleable)
+		if (template.scaleable)
 		{
 			data.scaleX = scale.x;
 			data.scaleY = scale.y;
 		}
-		if (rotatable) data.rotation = OGMO.project.anglesRadians ? rotation : rotation * Calc.RTD;
+		if (template.rotatable) data.rotation = OGMO.project.anglesRadians ? rotation : rotation * Calc.RTD;
+		if (template.canSetColor) data.color = template.includeAlpha ? color.toHexAlpha(template.includeHashtag) : color.toHex(template.includeHashtag);
 		data.texture = FileSystem.normalize(path);
 		data.originX = origin.x;
 		data.originY = origin.y;
@@ -48,7 +56,7 @@ class Decal
 
 	public function clone():Decal
 	{
-		return new Decal(position, path, texture, origin, scale, rotation, values);
+		return new Decal(position, path, texture, origin, scale, rotation, color, values);
 	}
 
 	function get_width():Int
@@ -63,7 +71,7 @@ class Decal
 
 	public function rotate(diff:Float)
 	{
-		rotation = rotation + diff;
+		rotation = Calc.snap(rotation + diff, rotationSnap);
 	}
 
 	public function resize(diff:Vector)
@@ -80,9 +88,9 @@ class Decal
 		scale.y = Calc.snap(scale.y, 1);
 	}
 
-	public function drawSelectionBox(origin:Bool)
+	public function drawSelectionBox(level: Level, origin:Bool)
 	{
-		var corners = getCorners(2);
+		var corners = getCorners(2, level.data.offset);
 		EDITOR.overlay.drawLine(corners[0], corners[1], Color.green);
 		EDITOR.overlay.drawLine(corners[1], corners[3], Color.green);
 		EDITOR.overlay.drawLine(corners[2], corners[3], Color.green);
@@ -98,11 +106,13 @@ class Decal
 			Vector.midPoint(corners[1], corners[3]),
 			Color.white
 		);
-		EDITOR.overlay.drawRect(position.x - 2, position.y - 2, 4, 4, Color.white);
+		EDITOR.overlay.drawRect(position.x + level.data.offset.x - 2, position.y + level.data.offset.y - 2, 4, 4, Color.white);
 	}
 
-	public function getCorners(pad:Float):Array<Vector>
+	public function getCorners(pad:Float, ?offset:Vector):Array<Vector>
 	{
+		if (offset == null) offset = new Vector(0, 0);
+
 		var corners:Array<Vector> = [
 			new Vector(-pad - width * origin.x * scale.x, -pad - height * origin.y * scale.y),
 			new Vector(pad + width * (1-origin.x) * scale.x, -pad - height * origin.y * scale.y),
@@ -117,7 +127,7 @@ class Decal
 			corner.x = x * rotation.cos() - y * rotation.sin();
 			corner.y = x * rotation.sin() + y * rotation.cos();
 		}
-		for (corner in corners) corner.add(position);
+		for (corner in corners) corner.add(position).add(offset);
 
 		return corners;
 	}

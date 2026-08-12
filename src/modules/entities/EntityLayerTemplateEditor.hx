@@ -42,7 +42,7 @@ class EntityLayerTemplateEditor extends LayerTemplateEditor
 
 		var excludedString = Fields.getField(excluded);
 		if (excludedString.length > 0)
-			entityTemplate.excludedTags = Fields.getField(excluded).split(',');
+			entityTemplate.excludedTags = excludedString.split(',');
 		else
 			entityTemplate.excludedTags = [];
 	}

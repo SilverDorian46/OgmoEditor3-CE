@@ -61,7 +61,7 @@ class TileFloodTool extends TileTool
 				if (!first && !layer.data[pX][pY].equals(tile))
 				{
 					first = true;
-					EDITOR.level.store("flood fill");
+					EDITOR.currentLevel.store("flood fill");
 					EDITOR.dirty();
 				}
 

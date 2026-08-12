@@ -1,5 +1,7 @@
 package modules.entities.tools;
 
+import level.data.Level;
+
 class EntityRotateTool extends EntityTool
 {
 
@@ -49,7 +51,7 @@ class EntityRotateTool extends EntityTool
 		if (!firstChange)
 		{
 			firstChange = true;
-			EDITOR.level.store('rotate entities');
+			EDITOR.currentLevel.store('rotate entities');
 		}
 		var angle = Calc.angleTo(origin, pos);
 		var initial = Calc.angleTo(origin, start);
@@ -66,7 +68,7 @@ class EntityRotateTool extends EntityTool
 		{
 			if (!changed)
 			{
-				EDITOR.level.store("rotate entities");
+				EDITOR.currentLevel.store("rotate entities");
 				changed = true;
 			}
 			entity.resetRotation();
@@ -75,44 +77,47 @@ class EntityRotateTool extends EntityTool
 		EDITOR.dirty();
 	}
 
-	override public function drawOverlay()
+	override public function drawOverlay(level: Level)
 	{
 		if (!rotating) return;
 		var at = Calc.angleTo(origin, start);
 
+		var offset = level.data.offset;
+		var drawOrigin = origin.clone().add(offset);
+
 		// Line to start
 		{
-			var vec = Vector.fromAngle(at, 80 / EDITOR.level.zoom);
-			vec.x += origin.x;
-			vec.y += origin.y;
+			var vec = Vector.fromAngle(at, 80 / EDITOR.zoom);
+			vec.x += origin.x + offset.x;
+			vec.y += origin.y + offset.y;
 
-			EDITOR.overlay.drawLine(origin, vec, Color.white);
-			EDITOR.overlay.drawLineNode(origin, 10 / EDITOR.level.zoom, Color.green);
+			EDITOR.overlay.drawLine(drawOrigin, vec, Color.white);
+			EDITOR.overlay.drawLineNode(drawOrigin, 10 / EDITOR.zoom, Color.green);
 		}
 
 		// Curve
 		{
-			var length = 60 / EDITOR.level.zoom;
+			var length = 60 / EDITOR.zoom;
 			var move = 10 * Calc.DTR;
 			var angle = Calc.angleTo(origin, last);
 			var last = Vector.fromAngle(at, length);
-			last.x += origin.x;
-			last.y += origin.y;
+			last.x += origin.x + offset.x;
+			last.y += origin.y + offset.y;
 			var vec = new Vector();
 
 			while (Math.abs(Calc.angleDiff(at, angle)) > 0.1 * Calc.DTR)
 			{
 				at = Calc.angleApproach(at, angle, move);
 				Vector.fromAngle(at, length, vec);
-				vec.x += origin.x;
-				vec.y += origin.y;
+				vec.x += origin.x + offset.x;
+				vec.y += origin.y + offset.y;
 
 				EDITOR.overlay.drawLine(last, vec, Color.white);
 				vec.clone(last);
 			}
 
 			// Line to mouse
-			EDITOR.overlay.drawLine(origin, last, Color.green);
+			EDITOR.overlay.drawLine(drawOrigin, last, Color.green);
 		}
 	}
 
@@ -122,7 +127,7 @@ class EntityRotateTool extends EntityTool
 	override public function keyToolAlt():Int return 1;
 	override public function keyToolShift():Int return 2;
 	override function isAvailable():Bool {
-		for (entity in layerEditor.entities.list) {
+		for (entity in layerEditor.getEntitiesFromCurrentLevel().list) {
 			for (e_id in layerEditor.selection.ids) if (entity.id == e_id && entity.template.rotatable) return true;
 		}
 		return false;

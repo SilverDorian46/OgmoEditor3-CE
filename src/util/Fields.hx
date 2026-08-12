@@ -183,12 +183,22 @@ class Fields
 		return element;
 	}
 
-	public static function createColor(label:String, color:Color, ?into:JQuery, ?onChange:Color->Void):JQuery
+	public static function setButtonLabel(element:JQuery, label:String):Void
+	{
+		element.find(".button_text").html(label);
+	}
+
+	public static function getButtonLabel(element:JQuery):String
+	{
+		return element.find(".button_text").html();
+	}
+
+	public static function createColor(label:String, color:Color, alpha:Bool, hashtag:Bool, ?into:JQuery, ?onChange:Color->Void):JQuery
 	{
 		var element = new JQuery('<div class="color-box">');
 		var child = new JQuery('<div>');
 		element.attr("data-hex", color.toHex());
-		element.attr("data-alpha", color.a);
+		if (alpha) element.attr("data-alpha", color.a);
 		element.append(child);
 		child.css("background", color.rgbaString());
 
@@ -199,7 +209,7 @@ class Fields
 			{
 				Fields.setColor(element, result);
 				if (onChange != null) onChange(result);
-			});
+			}, alpha, hashtag);
 		});
 
 		if (into != null) into.append(element);

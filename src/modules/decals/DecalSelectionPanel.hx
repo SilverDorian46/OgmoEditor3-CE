@@ -44,6 +44,8 @@ class DecalSelectionPanel extends SidePanel
 
 	override public function refresh()
 	{
+		var decalTemplate = (cast layerEditor.template : DecalLayerTemplate);
+
 		var sel = layerEditor.selected;
 
 		// list of entities
@@ -73,7 +75,8 @@ class DecalSelectionPanel extends SidePanel
 				if (arr.length > 1) label = '${arr.length}x ${d.path}';
 
 				var item = new ItemListItem(label);
-				if (d.texture != null) item.setImageIcon(d.texture.image.src);
+				//if (d.texture != null) item.setImageIcon(d.texture.image.src);
+				if (d.texture != null) item.setImageIcon(d.texture.extractImageDataURL());
 				decalList.add(item);
 
 				item.onclick = function (_)
@@ -101,11 +104,11 @@ class DecalSelectionPanel extends SidePanel
 					var pos = Fields.getVector(decalPos);
 					if (!pos.x.isNaN() && decal.position.x != pos.x)
 					{
-						EDITOR.level.store("Changed Decal X Position from '" + decal.position.x + "'	to '" + pos.x + "'");
+						EDITOR.currentLevel.store("Changed Decal X Position from '" + decal.position.x + "'	to '" + pos.x + "'");
 
 						for (decal in sel) decal.position.x = pos.x;
 
-						EDITOR.level.unsavedChanges = true;
+						EDITOR.currentLevel.unsavedChanges = true;
 						EDITOR.dirty();
 					}
 				});
@@ -113,30 +116,30 @@ class DecalSelectionPanel extends SidePanel
 					var pos = Fields.getVector(decalPos);
 					if (!pos.y.isNaN() && decal.position.y != pos.y)
 					{
-						EDITOR.level.store("Changed Decal X Position from '" + decal.position.y + "'	to '" + pos.y + "'");
+						EDITOR.currentLevel.store("Changed Decal X Position from '" + decal.position.y + "'	to '" + pos.y + "'");
 
 						for (decal in sel) decal.position.y = pos.y;
 
-						EDITOR.level.unsavedChanges = true;
+						EDITOR.currentLevel.unsavedChanges = true;
 						EDITOR.dirty();
 					}
 				});
 				Fields.createSettingsBlock(properties, decalPos, SettingsBlock.Full, "Position", SettingsBlock.OverTitle);
 
-				if ((cast layerEditor.template : DecalLayerTemplate).rotatable)
+				if (decalTemplate.rotatable)
 				{
 					var decalRot = Fields.createField("Rotation", Std.string(Calc.roundTo(decal.rotation * Calc.RTD, 3)));
 					decalRot.on('change keydown paste input', function(e) {
 						var rot = Calc.roundTo(Std.parseFloat(Fields.getField(decalRot)), 3);
 						if (!rot.isNaN())
 						{
-							EDITOR.level.store("Changed Decal Rotation from '" + decal.rotation * Calc.RTD + "'	to '" + rot + "'");
+							EDITOR.currentLevel.store("Changed Decal Rotation from '" + decal.rotation * Calc.RTD + "'	to '" + rot + "'");
 
 							for (decal in sel) {
-								decal.rotation = rot * Calc.DTR;
+								decal.rotation = Calc.snap(rot * Calc.DTR, Decal.rotationSnap);
 							}
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 						}
 					});
@@ -148,11 +151,11 @@ class DecalSelectionPanel extends SidePanel
 					var origin = Fields.getVector(decalOrigin);
 					if (!origin.x.isNaN() && decal.origin.x != origin.x)
 					{
-						EDITOR.level.store("Changed Decal X Origin from '" + decal.origin.x + "'	to '" + origin.x + "'");
+						EDITOR.currentLevel.store("Changed Decal X Origin from '" + decal.origin.x + "'	to '" + origin.x + "'");
 
 						for (decal in sel) decal.origin.x = origin.x;
 
-						EDITOR.level.unsavedChanges = true;
+						EDITOR.currentLevel.unsavedChanges = true;
 						EDITOR.dirty();
 					}
 				});
@@ -160,28 +163,28 @@ class DecalSelectionPanel extends SidePanel
 					var origin = Fields.getVector(decalOrigin);
 					if (!origin.y.isNaN() && decal.origin.y != origin.y)
 					{
-						EDITOR.level.store("Changed Decal Y Origin from '" + decal.origin.y + "'	to '" + origin.y + "'");
+						EDITOR.currentLevel.store("Changed Decal Y Origin from '" + decal.origin.y + "'	to '" + origin.y + "'");
 
 						for (decal in sel) decal.origin.y = origin.y;
 
-						EDITOR.level.unsavedChanges = true;
+						EDITOR.currentLevel.unsavedChanges = true;
 						EDITOR.dirty();
 					}
 				});
 				Fields.createSettingsBlock(properties, decalOrigin, SettingsBlock.Full, "Origin", SettingsBlock.OverTitle);
 
-				if ((cast layerEditor.template : DecalLayerTemplate).scaleable)
+				if (decalTemplate.scaleable)
 				{
 					var decalScale = Fields.createVector(decal.scale);
 					decalScale.find(".vecX").on('change keydown paste input', function(e) {
 						var scale = Fields.getVector(decalScale);
 						if (!scale.x.isNaN() && decal.scale.x != scale.x)
 						{
-							EDITOR.level.store("Changed Decal X Scale from '" + decal.scale.x + "'	to '" + scale.x + "'");
+							EDITOR.currentLevel.store("Changed Decal X Scale from '" + decal.scale.x + "'	to '" + scale.x + "'");
 
 							for (decal in sel) decal.scale.x = scale.x;
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 						}
 					});
@@ -189,15 +192,30 @@ class DecalSelectionPanel extends SidePanel
 						var scale = Fields.getVector(decalScale);
 						if (!scale.y.isNaN() && decal.scale.y != scale.y)
 						{
-							EDITOR.level.store("Changed Decal Y Scale from '" + decal.scale.y + "'	to '" + scale.y + "'");
+							EDITOR.currentLevel.store("Changed Decal Y Scale from '" + decal.scale.y + "'	to '" + scale.y + "'");
 
 							for (decal in sel) decal.scale.y = scale.y;
 
-							EDITOR.level.unsavedChanges = true;
+							EDITOR.currentLevel.unsavedChanges = true;
 							EDITOR.dirty();
 						}
 					});
 					Fields.createSettingsBlock(properties, decalScale, SettingsBlock.Full, "Scale", SettingsBlock.OverTitle);
+				}
+
+				if (decalTemplate.canSetColor)
+				{
+					var decalColor = Fields.createColor("Color", decal.color, decalTemplate.includeAlpha, decalTemplate.includeHashtag, null, function (c) {
+						if (!decal.color.equals(c)) {
+							EDITOR.currentLevel.store("Changed Decal Color from '" + decal.color.toHexAlpha() + "' to '" + c.toHexAlpha() + "'");
+
+							for (decal in sel) decal.color = c;
+
+							EDITOR.currentLevel.unsavedChanges = true;
+							EDITOR.dirty();
+						}
+					});
+					Fields.createSettingsBlock(properties, decalColor, SettingsBlock.Full, "Color", SettingsBlock.OverTitle);
 				}
 			}
 		}
@@ -209,7 +227,7 @@ class DecalSelectionPanel extends SidePanel
 			if (sel.length > 0)
 			{
 				// loop through all the decal values
-				for (valueTemplate in (cast layerEditor.template : DecalLayerTemplate).values)
+				for (valueTemplate in decalTemplate.values)
 				{
 					var values:Array<Value> = [];
 					for (decal in sel)

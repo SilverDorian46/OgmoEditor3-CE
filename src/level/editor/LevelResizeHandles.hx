@@ -1,5 +1,6 @@
 package level.editor;
 
+import level.data.Level;
 import js.jquery.JQuery;
 import util.Vector;
 import util.Rectangle;
@@ -8,18 +9,26 @@ class LevelResizeHandles
 {
 	public var handles:Array<{ box: Rectangle, points: Array<Vector>, anchor: Vector }>;
 	public var moused:Int = -1;
+	public var positionHandles:Array<Rectangle>;
+    public var positionHandleMoused:Bool = false;
 	public var resizing:Bool = false;
+	public var repositioning:Bool = false;
 	public var firstChange:Bool = false;
 	public var start:Vector = new Vector();
 	public var startSize: Vector = new Vector();
+    public var startOffset: Vector = new Vector();
 	public var sticker:JQuery;
+
 	public var canResize(get, never):Bool;
 	public var canResizeX(get, never):Bool;
 	public var canResizeY(get, never):Bool;
+	public var canReposition(get, never):Bool;
+    public var currentlyMoused(get, never):Bool;
 
 	public function new()
 	{
 		handles = [];
+		positionHandles = [];
 		sticker = new JQuery(".sticker-size");
 
 		var a = 0.5;
@@ -93,10 +102,16 @@ class LevelResizeHandles
 
 	public function refresh():Void
 	{
-		if (EDITOR.level != null)
+		var level = EDITOR.currentLevel;
+		if (level != null)
 		{
-			var pad = 30 / EDITOR.level.zoom;
-			var size = 15 / EDITOR.level.zoom;
+			var zoom = EDITOR.zoom;
+
+			var pad = 30 / zoom;
+			var size = 15 / zoom;
+
+			var lvlOffset = level.data.offset;
+			var lvlSize = level.data.size;
 
 			for (i in 0...handles.length)
 			{
@@ -104,30 +119,100 @@ class LevelResizeHandles
 				h.box.width = h.box.height = size;
 
 				if (h.anchor.x >= 1)
-					h.box.centerX = -pad;
+					h.box.centerX = lvlOffset.x - pad;
 				else if (h.anchor.x <= 0)
-					h.box.centerX = EDITOR.level.data.size.x + pad;
+					h.box.centerX = lvlOffset.x + lvlSize.x + pad;
 				else
-					h.box.centerX = EDITOR.level.data.size.x * h.anchor.x;
+					h.box.centerX = lvlOffset.x + lvlSize.x * h.anchor.x;
 
 				if (h.anchor.y >= 1)
-					h.box.centerY = -pad;
+					h.box.centerY = lvlOffset.y - pad;
 				else if (h.anchor.y <= 0)
-					h.box.centerY = EDITOR.level.data.size.y + pad;
+					h.box.centerY = lvlOffset.y + lvlSize.y + pad;
 				else
-					h.box.centerY = EDITOR.level.data.size.y * h.anchor.y;
+					h.box.centerY = lvlOffset.y + lvlSize.y * h.anchor.y;
 			}
+
+			if (canReposition)
+			{
+                if (positionHandles.length <= 0)
+                    for (i in 0...4)
+                        positionHandles.push(new Rectangle());
+
+				var pad2 = 10 / zoom;
+				var size2 = 5 / zoom;
+
+				var handle = positionHandles[0]; // top
+				if (handle != null)
+				{
+					handle.x = lvlOffset.x - pad2 - size2;
+					handle.y = lvlOffset.y - pad2 - size2;
+					handle.width = lvlSize.x + ((pad2 + size2) * 2);
+					handle.height = size2;
+
+					handle = positionHandles[1]; // left
+					if (handle != null)
+					{
+						handle.x = lvlOffset.x - pad2 - size2;
+						handle.y = lvlOffset.y - pad2;
+						handle.width = size2;
+						handle.height = lvlSize.y + (pad2 * 2);
+
+						handle = positionHandles[2]; // right
+						if (handle != null)
+						{
+							handle.x = lvlOffset.x + lvlSize.x + pad2;
+							handle.y = lvlOffset.y - pad2;
+							handle.width = size2;
+							handle.height = lvlSize.y + (pad2 * 2);
+
+							handle = positionHandles[3]; // bottom
+							if (handle != null)
+							{
+								handle.x = lvlOffset.x - pad2 - size2;
+								handle.y = lvlOffset.y + lvlSize.y + pad2;
+								handle.width = lvlSize.x + ((pad2 + size2) * 2);
+								handle.height = size2;
+							}
+						}
+					}
+				}
+			}
+            else while (positionHandles.length > 0)
+                positionHandles.pop();
 		}
 	}
 
 	static var idleColor = Color.gray.x(0.5);
-	static var hoverColor = Color.yellow;
-	static var dragColor = Color.green;
+	static var hoverColor = Color.yellow.clone();
+	static var dragColor = Color.green.clone();
+	static var warningColor = Color.red.x(0.7);
 
 	public function draw():Void
 	{
-		if (EDITOR.level != null)
+		var level = EDITOR.currentLevel;
+		if (level != null)
 		{
+            var shouldWarnSize = level.shouldWarnSize;
+
+			for (handle in positionHandles)
+            {
+                var col: Color;
+                if (positionHandleMoused)
+                {
+                    if (repositioning)
+                        col = LevelResizeHandles.dragColor;
+                    else
+                        col = LevelResizeHandles.hoverColor;
+                }
+                else if (shouldWarnSize)
+                    col = LevelResizeHandles.warningColor;
+                else
+                    col = LevelResizeHandles.idleColor;
+
+                EDITOR.draw.drawRect(handle.x, handle.y, handle.width, handle.height, col);
+            }
+
 			for (i in 0...handles.length)
 			{
 				var h = handles[i];
@@ -140,6 +225,8 @@ class LevelResizeHandles
 					else
 						col = LevelResizeHandles.hoverColor;
 				}
+				else if (shouldWarnSize)
+					col = LevelResizeHandles.warningColor;
 				else
 					col = LevelResizeHandles.idleColor;
 
@@ -160,33 +247,49 @@ class LevelResizeHandles
 		}
 	}
 
-	public function getAt(pos: Vector):Int
-	{
-		for (i in 0...handles.length)
-			if (handles[i].box.contains(pos))
-				return i;
-		return -1;
-	}
+    public function updateMousedHandle(pos: Vector):Void
+    {
+        function getAt(pos: Vector):Int
+	    {
+		    for (i in 0...handles.length)
+			    if (handles[i].box.contains(pos))
+				    return i;
+		    return -1;
+	    }
 
-	public function onMouseMove(pos: Vector):Void
+        function atPositionHandle(pos: Vector):Bool
+        {
+            for (handle in positionHandles)
+                if (handle.contains(pos))
+                    return true;
+            return false;
+        }
+
+        moused = getAt(pos);
+        positionHandleMoused = moused == -1 && atPositionHandle(pos);
+    }
+
+	public function onMouseMove(level: Level, pos: Vector):Void
 	{
 		if (resizing)
 		{
 			var h = handles[moused];
 
+			var currentLayer = level.currentLayer;
+
 			//Figure out grid snap values
 			var snap: Vector;
 			if (OGMO.ctrl) snap = new Vector(1, 1);
-			else snap = EDITOR.level.currentLayer.template.gridSize.clone();
+			else snap = currentLayer.template.gridSize.clone();
 
 			var snapOffset: Vector = new Vector(0, 0);
 			if (!OGMO.ctrl)
 			{
-				if (h.anchor.x <= 0) snapOffset.x = EDITOR.level.currentLayer.offset.x;
-				else if (h.anchor.x >= 1) snapOffset.x = EDITOR.level.currentLayer.leftoverX;
+				if (h.anchor.x <= 0) snapOffset.x = currentLayer.offset.x;
+				else if (h.anchor.x >= 1) snapOffset.x = currentLayer.leftoverX;
 
-				if (h.anchor.y <= 0) snapOffset.y = EDITOR.level.currentLayer.offset.y;
-				else if (h.anchor.y >= 1) snapOffset.y = EDITOR.level.currentLayer.leftoverY;
+				if (h.anchor.y <= 0) snapOffset.y = currentLayer.offset.y;
+				else if (h.anchor.y >= 1) snapOffset.y = currentLayer.leftoverY;
 			}
 
 			//Figure out drag direction stuff
@@ -213,68 +316,141 @@ class LevelResizeHandles
 
 			//Prevent resizing from edges
 			if (h.anchor.x > 0 && h.anchor.x < 1)
-				newSize.x = EDITOR.level.data.size.x;
+				newSize.x = level.data.size.x;
 			if (h.anchor.y > 0 && h.anchor.y < 1)
-				newSize.y = EDITOR.level.data.size.y;
+				newSize.y = level.data.size.y;
 
 			//Clamp new size
 			newSize.x = Calc.clamp(newSize.x, OGMO.project.levelMinSize.x, OGMO.project.levelMaxSize.x);
 			newSize.y = Calc.clamp(newSize.y, OGMO.project.levelMinSize.y, OGMO.project.levelMaxSize.y);
 
-			if (!EDITOR.level.data.size.equals(newSize))
+			if (!level.data.size.equals(newSize))
 			{
 				//Pan the camera
-				pan.x *= (newSize.x - EDITOR.level.data.size.x);
-				pan.y *= (newSize.y - EDITOR.level.data.size.y);
-				start.x -= pan.x;
-				start.y -= pan.y;
-				pan.x *= EDITOR.level.camera.a;
-				pan.y *= EDITOR.level.camera.d;
-				EDITOR.level.moveCamera(-pan.x, -pan.y);
+				if (!EDITOR.isEditingMap)
+				{
+					pan.x *= (newSize.x - level.data.size.x);
+					pan.y *= (newSize.y - level.data.size.y);
+					start.x -= pan.x;
+					start.y -= pan.y;
+					pan.x *= EDITOR.camera.a;
+					pan.y *= EDITOR.camera.d;
+					EDITOR.moveCamera(-pan.x, -pan.y);
+				}
 
 				//Store undo
 				if (!firstChange)
 				{
 					firstChange = true;
-					EDITOR.level.storeFull(h.anchor.x >= 1, h.anchor.y >= 1, "resize level");
+					level.storeFull(h.anchor.x >= 1, h.anchor.y >= 1, "resize level");
 				}
 
                 //Calc shift amount
                 var shift = new Vector();
                 if (h.anchor.x >= 1)
-                    shift.x = newSize.x - EDITOR.level.data.size.x;
+                    shift.x = newSize.x - level.data.size.x;
                 if (h.anchor.y >= 1)
-                    shift.y = newSize.y - EDITOR.level.data.size.y;
+                    shift.y = newSize.y - level.data.size.y;
 
                 //Do the resize
-                EDITOR.level.resize(newSize, shift);
-                refresh();
-                EDITOR.dirty();
-                refreshSizeReadout();
+                level.resize(newSize, shift);
+
+				//Shift level offset if currently editing map
+				if (EDITOR.isEditingMap)
+				{
+					level.data.offset.x -= shift.x;
+					level.data.offset.y -= shift.y;
+				}
+
+				//Refresh editor and handlers
+				refresh();
+				EDITOR.dirty();
+				refreshSizeReadout(level);
             }
         }
+		else if (repositioning)
+		{
+            var snap: Vector;
+            if (OGMO.ctrl) snap = new Vector(1, 1);
+            else snap = level.currentLayer.template.gridSize.clone();
+
+            var snapOffset: Vector = new Vector(0, 0);
+            if (!OGMO.ctrl)
+            {
+                snapOffset.x = Calc.mod(startOffset.x, snap.x);
+                snapOffset.y = Calc.mod(startOffset.y, snap.y);
+            }
+
+            var newOffset: Vector = new Vector(
+                startOffset.x + (pos.x - start.x),
+                startOffset.y + (pos.y - start.y)
+            );
+            newOffset.x = Calc.snap(newOffset.x, snap.x, snapOffset.x);
+            newOffset.y = Calc.snap(newOffset.y, snap.y, snapOffset.y);
+
+            if (!level.data.offset.equals(newOffset))
+            {
+                //var pan: Vector = new Vector();
+                //pan.x = (newOffset.x - level.data.offset.x);
+                //pan.y = (newOffset.y - level.data.offset.y);
+                //start.x -= pan.x;
+                //start.y -= pan.y;
+                //pan.x *= EDITOR.camera.a;
+                //pan.y *= EDITOR.camera.d;
+                //EDITOR.moveCamera(-pan.x, -pan.y);
+
+                if (!firstChange)
+                {
+                    firstChange = true;
+                    level.storeLevelData("reposition level");
+                }
+
+                level.data.offset = newOffset.clone();
+
+                refresh();
+                EDITOR.dirty();
+                refreshOffsetReadout(level);
+            }
+		}
         else
         {
             var old = moused;
-            moused = getAt(pos);
-            if (old != moused)
+            var old2 = positionHandleMoused;
+            updateMousedHandle(pos);
+
+            if (old != moused || old2 != positionHandleMoused)
                 EDITOR.dirty();
         }
     }
 
-    public function onMouseDown(pos: Vector):Bool
+    public function onMouseDown(level: Level, pos: Vector):Bool
     {
-        moused = getAt(pos);
+        updateMousedHandle(pos);
 
         if (moused != -1)
         {
             resizing = true;
             firstChange = false;
-            EDITOR.level.data.size.clone(startSize);
+            level.data.size.clone(startSize);
             pos.clone(start);
             EDITOR.locked = true;
             EDITOR.dirty();
-            refreshSizeReadout();
+            refreshSizeReadout(level);
+
+            if (!sticker.hasClass("active"))
+                sticker.addClass("active");
+
+            return true;
+        }
+        else if (positionHandleMoused)
+        {
+            repositioning = true;
+            firstChange = false;
+            level.data.offset.clone(startOffset);
+            pos.clone(start);
+            EDITOR.locked = true;
+            EDITOR.dirty();
+            refreshOffsetReadout(level);
 
             if (!sticker.hasClass("active"))
                 sticker.addClass("active");
@@ -285,44 +461,69 @@ class LevelResizeHandles
             return false;
     }
 
-    public function refreshSizeReadout():Void
+    public function refreshSizeReadout(level: Level):Void
     {
-      sticker.text(EDITOR.level.data.size.x + " x " + EDITOR.level.data.size.y);
+        sticker.text(level.data.size.x + " x " + level.data.size.y);
+    }
+
+	public function refreshOffsetReadout(level: Level):Void
+    {
+        sticker.text(level.data.offset.x + ", " + level.data.offset.y);
     }
 
     public function stopResizing():Void
     {
-      resizing = false;
-      EDITOR.locked = false;
-      EDITOR.level.updateCameraInverse();
-      EDITOR.dirty();
+        resizing = false;
+        EDITOR.locked = false;
+        EDITOR.updateCameraInverse();
+        EDITOR.dirty();
 
-      if (sticker.hasClass("active")) sticker.removeClass("active");
+        if (sticker.hasClass("active")) sticker.removeClass("active");
     }
 
-    public function onMouseUp(pos: Vector):Bool
-    {
-      if (resizing)
-      {
-        stopResizing();
-        return true;
-      }
-      else return false;
-    }
+	public function stopRepositioning():Void
+	{
+		repositioning = false;
+		EDITOR.locked = false;
+		EDITOR.updateCameraInverse();
+		EDITOR.dirty();
 
-    public function onRightDown(pos: Vector):Bool
-    {
-      if (resizing)
-      {
-          stopResizing();
-          return true;
-      }
-      else return false;
-    }
+		if (sticker.hasClass("active")) sticker.removeClass("active");
+	}
+
+	public function onMouseUp(pos:Vector):Bool
+	{
+		if (resizing)
+		{
+			stopResizing();
+			return true;
+		}
+		else if (repositioning)
+		{
+			stopRepositioning();
+			return true;
+		}
+		else return false;
+	}
+
+	public function onRightDown(pos:Vector):Bool
+	{
+		if (resizing)
+		{
+			stopResizing();
+			return true;
+		}
+		else if (repositioning)
+		{
+			stopRepositioning();
+			return true;
+		}
+		else return false;
+	}
 
     public function onRightUp(pos: Vector):Bool
     {
-        return resizing;
+        return resizing || repositioning;
     }
 
     function get_canResize():Bool
@@ -338,5 +539,15 @@ class LevelResizeHandles
     function get_canResizeY():Bool
     {
         return OGMO.project.levelMinSize.y != OGMO.project.levelMaxSize.y;
+    }
+
+	function get_canReposition():Bool
+	{
+		return EDITOR.isEditingMap;
+	}
+
+    function get_currentlyMoused():Bool
+    {
+        return moused != -1 || positionHandleMoused;
     }
 }

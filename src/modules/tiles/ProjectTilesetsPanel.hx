@@ -111,20 +111,25 @@ class ProjectTilesetsPanel extends ProjectEditorPanel
 				});
 			});
 			Fields.createSettingsBlock(into, tileLabel, SettingsBlock.Third, "Label", SettingsBlock.InlineTitle);
+
 			tilePath = Fields.createField("File Path", tileset.path);
 			Fields.createSettingsBlock(into, tilePath, SettingsBlock.TwoThirds, "Path", SettingsBlock.InlineTitle);
+
 			Fields.createLineBreak(into);
 
 			// tile size + separation + margin
 			tileSize = Fields.createVector(new Vector(tileset.tileWidth, tileset.tileHeight));
 			tileSize.find("input").on("change", function() { refreshCanvas(context); });
 			Fields.createSettingsBlock(into, tileSize, SettingsBlock.Third, "Tile Size", SettingsBlock.InlineTitle);
+
 			tileSeparation = Fields.createVector(new Vector(tileset.tileSeparationX, tileset.tileSeparationY));
 			tileSeparation.find("input").on("change", function() { refreshCanvas(context); });
 			Fields.createSettingsBlock(into, tileSeparation, SettingsBlock.Third, "Tile Separation", SettingsBlock.InlineTitle);
+
 			tileMargin = Fields.createVector(new Vector(tileset.tileMarginX, tileset.tileMarginY));
 			tileMargin.find("input").on("change", function() { refreshCanvas(context); });
 			Fields.createSettingsBlock(into, tileMargin, SettingsBlock.Third, "Tile Margin", SettingsBlock.InlineTitle);
+
 			Fields.createLineBreak(into);
 
 			// add canvas
@@ -164,6 +169,14 @@ class ProjectTilesetsPanel extends ProjectEditorPanel
 					self.refreshList();
 				});
 
+				menu.addOption("duplicate", "new-file", function()
+				{
+					var clone = Tileset.clone(current.data, OGMO.project);
+					OGMO.project.tilesets.push(clone);
+					self.refreshList();
+					self.inspect(clone);
+				});
+
 				current.highlighted = true;
 				menu.open();
 			}
@@ -176,7 +189,8 @@ class ProjectTilesetsPanel extends ProjectEditorPanel
 		var s = zoom;
 
 		context.clearRect(0, 0, tileset.width * s, tileset.height * s);
-		context.drawImage(tileset.texture.image, 0, 0, tileset.width * s, tileset.height * s);
+		var subtexture = tileset.texture;
+		context.drawImage(subtexture.texture.image, subtexture.sourceX, subtexture.sourceY, subtexture.width, subtexture.height, 0, 0, tileset.width * s, tileset.height * s);
 
 		var gridSize = Fields.getVector(tileSize);
 		var gridSep = Fields.getVector(tileSeparation);

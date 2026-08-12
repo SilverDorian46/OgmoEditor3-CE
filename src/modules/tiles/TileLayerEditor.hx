@@ -1,5 +1,6 @@
 package modules.tiles;
 
+import level.data.Level;
 import modules.tiles.TileLayer.TileData;
 import level.editor.LayerEditor;
 
@@ -14,13 +15,22 @@ class TileLayerEditor extends LayerEditor
 		super(id);
 	}
 
-	override function draw():Void
+	override function draw(level: Level):Void
 	{
+		var layer = getLayer(level);
+
+		var offx = level.data.offset.x + layer.offset.x;
+		var offy = level.data.offset.y + layer.offset.y;
 		for (x in 0...layer.gridCellsX) for (y in 0...layer.gridCellsY)
 		{
 			var l:TileLayer = cast layer;
 			var tile = l.data[x][y];
-			if (!tile.isEmptyTile()) EDITOR.draw.drawTile(x * l.template.gridSize.x, y * layer.template.gridSize.y, l.tileset, tile);
+			if (tile != null && !tile.isEmptyTile()) EDITOR.draw.drawTile(
+				offx + x * l.template.gridSize.x,
+				offy + y * layer.template.gridSize.y,
+				l.tileset,
+				tile
+			);
 		}
 	}
 	
@@ -33,7 +43,7 @@ class TileLayerEditor extends LayerEditor
 	{
 		if (brushIsContiguous)
 		{
-			var layer:TileLayer = cast this.layer;
+			var layer:TileLayer = cast this.getLayerFromCurrentLevel();
 			var atX = layer.tileset.getTileX(brush[0][0].idx);
 			var atY = layer.tileset.getTileY(brush[0][0].idx);
 			atX += x;
@@ -80,7 +90,7 @@ class TileLayerEditor extends LayerEditor
 
 	public function setBrushRect(topLeft:Int):Void
 	{
-		for (x in 0...brush.length) for (y in 0...brush[x].length) brush[x][y].idx = topLeft + x + y * (cast layer : TileLayer).tileset.tileColumns;
+		for (x in 0...brush.length) for (y in 0...brush[x].length) brush[x][y].idx = topLeft + x + y * (cast getLayerFromCurrentLevel() : TileLayer).tileset.tileColumns;
 	}
 
 	override function keyRepeat(key:Int):Void
@@ -103,7 +113,7 @@ class TileLayerEditor extends LayerEditor
 	{
 		for (x in 0...brush.length) for (y in 0...brush[x].length)
 		{
-			if (brush[x][y].isEmptyTile() || brush[x][y].idx != brush[0][0].idx + x + y * (cast layer : TileLayer).tileset.tileColumns)
+			if (brush[x][y].isEmptyTile() || brush[x][y].idx != brush[0][0].idx + x + y * (cast getLayerFromCurrentLevel() : TileLayer).tileset.tileColumns)
 				return false;
 		}
 		return true;
@@ -114,13 +124,13 @@ class TileLayerEditor extends LayerEditor
 		if (brushIsContiguous)
 		{
 			var first = brush[0][0].idx;
-			var columns = (cast layer : TileLayer).tileset.tileColumns;
+			var columns = (cast getLayerFromCurrentLevel() : TileLayer).tileset.tileColumns;
 			return new Rectangle(first % columns, Math.floor(first / columns), brush.length, brush[0].length);
 		}
 		else return null;
 	}
 
-	override public function afterUndoRedo()
+	override public function afterUndoRedo(level: Level)
 	{
 		EDITOR.toolBelt.current.activated();
 	}
