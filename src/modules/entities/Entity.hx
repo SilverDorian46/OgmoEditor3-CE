@@ -73,6 +73,7 @@ class Entity
 	public static function load(data:Dynamic): Entity
 	{
 		var template = OGMO.project.getEntityTemplateByExportID(data._eid);
+		if (template == null) template = OGMO.project.getEntityTemplateByName(data.name);
 		if (template == null || data.id == null) return null;
 
 		var e = new Entity();

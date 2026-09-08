@@ -84,13 +84,11 @@ class Level
 		var layers = Imports.contentsArray(data, "layers");
 		for (i in 0...layers.length)
 		{
-			var eid = layers[i]._eid;
-			if (eid != null)
-			{
-				var layer = getLayerByExportID(eid);
-				if (layer != null)
-					layer.load(layers[i]);
-			}
+			var layerData = layers[i];
+
+			var layer = getLayerByExportID(layerData._eid);
+			if (layer == null) layer = getLayerByName(layerData.name);
+			if (layer != null) layer.load(layerData);
 		}
 
 		return this;
@@ -232,7 +230,13 @@ class Level
 
 	public function getLayerByExportID(exportID:String): Layer
 	{
-		for (layer in layers) if (layer.template.exportID == exportID) return layer;
+		if (exportID != null) for (layer in layers) if (layer.template.exportID == exportID) return layer;
+		return null;
+	}
+
+	public function getLayerByName(name:String): Layer
+	{
+		if (name != null) for (layer in layers) if (layer.template.name == name) return layer;
 		return null;
 	}
 

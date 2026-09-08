@@ -107,7 +107,13 @@ class Project
 
 	public function getEntityTemplateByExportID(exportID:String): EntityTemplate
 	{
-		for (entity in entities.templates) if (entity.exportID == exportID) return entity;
+		if (exportID != null) for (entity in entities.templates) if (entity.exportID == exportID) return entity;
+		return null;
+	}
+
+	public function getEntityTemplateByName(name:String): EntityTemplate
+	{
+		if (name != null) for (entity in entities.templates) if (entity.name == name) return entity;
 		return null;
 	}
 	
