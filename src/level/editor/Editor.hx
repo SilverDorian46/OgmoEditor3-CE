@@ -887,7 +887,7 @@ class Editor
 			//Background
 			if (!previewingBackdrops)
 			{
-				draw.drawRect(offset.x + 12, offset.y + 12, size.x, size.y, Color.black.x(.8));
+				draw.drawRect(offset.x + 12, offset.y + 12, size.x, size.y, Color.black.x(.5));
 				draw.drawRect(offset.x - 1, offset.y - 1, size.x + 2, size.y + 2, Color.black);
 				draw.drawRect(offset.x, offset.y, size.x, size.y, level.project.backgroundColor);
 			}
