@@ -1,5 +1,6 @@
 package level.data;
 
+import rendering.Texture;
 import js.Browser;
 import util.Popup;
 import electron.renderer.Remote;
@@ -38,6 +39,9 @@ class Level
 	public var externallyModified(get, null):Bool;
 	//public var zoom(get, null):Float;
 	public var shouldWarnSize(get, null):Bool;
+
+	public var levelTexture(default, set): Texture = null;
+	public var isLoadingTexture: Bool = false;
 
 	public static function isUnsavedPath(path:String):Bool
 	{
@@ -350,5 +354,12 @@ class Level
 	function get_shouldWarnSize():Bool
 	{
 		return data.size.x < project.levelScreenSize.x || data.size.y < project.levelScreenSize.y;
+	}
+
+	function set_levelTexture(value: Texture): Texture
+	{
+		levelTexture = value;
+		isLoadingTexture = false;
+		return levelTexture;
 	}
 }

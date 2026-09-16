@@ -1,5 +1,6 @@
 package level.editor;
 
+import rendering.Texture;
 import modules.decals.DecalLayerEditor;
 import modules.entities.EntityLayerEditor;
 import js.node.ChildProcess;
@@ -581,6 +582,15 @@ class Editor
 			dirty();
 		}
 
+		function clearLevelTexture()
+		{
+			if (level != null && level.levelTexture != null)
+			{
+				level.levelTexture.dispose();
+				level.levelTexture = null;
+			}
+		}
+
 		if (isEditingMap && !levelMap.contains(level))
 		{
 			var dir = (level != null && level.path != null) ? Path.directory(level.path) : "";
@@ -591,6 +601,7 @@ class Editor
 				{
 					clearLevelMap();
 					refreshEditor();
+					clearLevelTexture();
 					if (onAfterSet != null) onAfterSet();
 				});
 				return;
@@ -598,6 +609,7 @@ class Editor
 		}
 
 		refreshEditor();
+		clearLevelTexture();
 		if (onAfterSet != null) onAfterSet();
 	}
 
@@ -815,6 +827,11 @@ class Editor
 	public function toggleLayerVisibility(id:Int):Bool
 	{
 		layerEditors[id].visible = !layerEditors[id].visible;
+		if (isEditingMap) for (level in levelMap) if (level.levelTexture != null)
+		{
+			level.levelTexture.dispose();
+			level.levelTexture = null;
+		}
 		EDITOR.dirty();
 		return layerEditors[id].visible;
 	}
@@ -825,9 +842,64 @@ class Editor
 
 	public function drawLevels():Void
 	{
-		draw.setAlpha(1);
-
 		var level = EDITOR.currentLevel;
+
+		// pre-draw level textures if currently editing a level map
+		if (isEditingMap)
+		{
+			for (other in levelMap) if (other != level && other.levelTexture == null && !other.isLoadingTexture)
+			{
+				var camBackup = EDITOR.camera.clone();
+				
+				draw.setAlpha(1);
+				draw.setupRenderTarget(other.data.size);
+
+				var offsetBackup = other.data.offset;
+				other.data.offset = new Vector();
+					
+				var i = other.layers.length - 1;
+				while(i >= 0) 
+				{
+					if (EDITOR.layerEditors[i] != null && EDITOR.layerEditors[i].visible) EDITOR.layerEditors[i].drawNoHover(other);
+					i--;
+				}
+
+				draw.finishDrawing();
+
+				other.data.offset = offsetBackup;
+
+				var pixels = draw.getRenderTargetPixels();
+
+				var canvas = Browser.document.createCanvasElement();
+				canvas.width = Math.floor(other.data.size.x);
+				canvas.height = Math.floor(other.data.size.y);
+
+				var ctx = canvas.getContext2d();
+				ctx.imageSmoothingEnabled = false;
+
+				var imageData = ctx.createImageData(canvas.width, canvas.height);
+				for (i in 0...imageData.data.length)
+					imageData.data[i] = pixels[i];
+				ctx.putImageData(imageData, 0, 0);
+
+				other.isLoadingTexture = true;
+				Texture.loadFromData(canvas.toDataURL("image/png"), function(texture)
+				{
+					other.levelTexture = texture;
+					other.isLoadingTexture = false;
+
+					EDITOR.dirty();
+				});
+
+				canvas.remove();
+
+				draw.doneRenderTarget();
+				draw.destroyRenderTarget();
+
+				EDITOR.camera = camBackup;
+				EDITOR.updateCameraInverse();
+			}
+		}
 
 		var offset, size;
 		if (level != null)
@@ -840,6 +912,8 @@ class Editor
 			offset = new Vector();
 			size = new Vector();
 		}
+
+		draw.setAlpha(1);
 
 		// preview background style
 		if (previewingBackdrops)
@@ -860,22 +934,15 @@ class Editor
 
 			draw.setAlpha(0.5);
 
-			for (other in levelMap) if (other != level)
-			{
-				var i = other.layers.length - 1;
-				while(i >= 0) 
-				{
-					if (EDITOR.layerEditors[i] != null && EDITOR.layerEditors[i].visible) EDITOR.layerEditors[i].drawNoHover(other);
-					i--;
-				}
-			}
+			for (other in levelMap) if (other != level && other.levelTexture != null)
+				draw.drawTexture(other.data.offset.x, other.data.offset.y, other.levelTexture);
 
 			if (mousedMapLevel >= 0 && mousedMapLevel < levelMap.length)
 			{
 				var other = levelMap[mousedMapLevel];
 
 				draw.setAlpha(1);
-				draw.drawRect(other.data.offset.x, other.data.offset.y, other.data.size.x, other.data.size.y, Color.yellow.x(0.75));
+				draw.drawRect(other.data.offset.x, other.data.offset.y, other.data.size.x, other.data.size.y, Color.yellow.x(0.5));
 			}
 		}
 
