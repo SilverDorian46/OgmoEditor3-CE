@@ -92,6 +92,10 @@ class GLRenderer
 		offscreenTexture = gl.createTexture();
 		gl.bindTexture(RenderingContext.TEXTURE_2D, offscreenTexture);
 
+		// hack fix for drawing to work. doesn't look very good at the moment. should investigate further
+		gl.disable(RenderingContext.SAMPLE_ALPHA_TO_COVERAGE);
+		gl.disable(RenderingContext.SAMPLE_COVERAGE);
+
 		var level = 0;
 		var internalFormat = RenderingContext.RGBA;
 		var border = 0;
@@ -133,6 +137,10 @@ class GLRenderer
 
 	public function destroyRenderTarget(): Void
 	{
+		// hack fix
+		gl.enable(RenderingContext.SAMPLE_ALPHA_TO_COVERAGE);
+		gl.enable(RenderingContext.SAMPLE_COVERAGE);
+
 		gl.deleteTexture(offscreenTexture);
 		gl.deleteFramebuffer(offscreenFramebuffer);
 	}
