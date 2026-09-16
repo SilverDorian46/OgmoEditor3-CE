@@ -501,8 +501,9 @@ class Entity
 		p.y -= entPos.y;
 		_matrix.inverseTransformPoint(p, p);
 
-		var valX = 1 + (4 / (size.x * 0.5));
-		var valY = 1 + (4 / (size.y * 0.5));
+		var pad = (EDITOR.zoom != 0) ? (8 / EDITOR.zoom) : 0;
+		var valX = 1 + (pad / (size.x * 0.5));
+		var valY = 1 + (pad / (size.y * 0.5));
 
 		return (p.x >= -valX && p.x < valX && p.y >= -valY && p.y < valY);
 	}
@@ -513,8 +514,9 @@ class Entity
 		p.x -= nodePos.x;
 		p.y -= nodePos.y;
 
-		var valX = 2 + (template.nodePointSize.x * 0.5);
-		var valY = 2 + (template.nodePointSize.y * 0.5);
+		var pad = (EDITOR.zoom != 0) ? (8 / EDITOR.zoom) : 0;
+		var valX = pad + (template.nodePointSize.x * 0.5);
+		var valY = pad + (template.nodePointSize.y * 0.5);
 
 		return (p.x >= -valX && p.x < valX && p.y >= -valY && p.y < valY);
 	}
